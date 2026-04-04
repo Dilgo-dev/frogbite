@@ -2,6 +2,7 @@ mod app;
 mod collections;
 mod curl;
 mod history;
+mod postman;
 mod settings;
 mod ui;
 
@@ -135,6 +136,10 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
         }
         return false;
     }
+    if app.postman_import_open {
+        handle_postman_import_key(app, key);
+        return false;
+    }
     if app.curl_import_open {
         handle_curl_import_key(app, key);
         return false;
@@ -211,6 +216,22 @@ fn handle_method_popup_key(app: &mut App, key: KeyCode) {
             app.method_popup_selected = app.method_popup_selected.saturating_sub(1);
         }
         KeyCode::Enter => app.confirm_method_popup(),
+        _ => {}
+    }
+}
+
+fn handle_postman_import_key(app: &mut App, key: &event::KeyEvent) {
+    match key.code {
+        KeyCode::Esc => app.postman_import_open = false,
+        KeyCode::Enter => app.confirm_postman_import(),
+        KeyCode::Backspace => {
+            app.postman_import_buffer.pop();
+            app.postman_import_error = false;
+        }
+        KeyCode::Char(c) => {
+            app.postman_import_buffer.push(c);
+            app.postman_import_error = false;
+        }
         _ => {}
     }
 }
@@ -310,6 +331,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
                 KeyCode::Char('d') => app.request_delete(),
                 KeyCode::Char('D') => app.duplicate_request(),
                 KeyCode::Char('i') => app.open_curl_import(),
+                KeyCode::Char('I') => app.open_postman_import(),
                 KeyCode::Char('c') => app.open_curl_export(),
                 KeyCode::Char('j') | KeyCode::Down => {
                     let max = app.sidebar_len().saturating_sub(1);

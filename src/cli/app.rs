@@ -5,6 +5,7 @@ use frogbite::core::http::{HttpResponse, RequestOptions};
 use crate::collections::{self, CollectionData, Folder, SavedRequest};
 use crate::curl;
 use crate::history::{self, HistoryEntry};
+use crate::postman;
 use crate::settings::{self, Settings};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -118,6 +119,9 @@ pub struct App {
     pub curl_import_error: bool,
     pub curl_export_open: bool,
     pub curl_export_content: String,
+    pub postman_import_open: bool,
+    pub postman_import_buffer: String,
+    pub postman_import_error: bool,
 }
 
 impl App {
@@ -173,6 +177,9 @@ impl App {
             curl_import_error: false,
             curl_export_open: false,
             curl_export_content: String::new(),
+            postman_import_open: false,
+            postman_import_buffer: String::new(),
+            postman_import_error: false,
         };
 
         if let Some(id) = &app.active_request_id.clone() {
@@ -714,6 +721,28 @@ impl App {
         self.curl_export_content =
             curl::export(self.method.as_str(), &self.url, &self.headers, &self.body);
         self.curl_export_open = true;
+    }
+
+    // -- Postman import --
+
+    pub fn open_postman_import(&mut self) {
+        self.postman_import_buffer = String::new();
+        self.postman_import_error = false;
+        self.postman_import_open = true;
+    }
+
+    pub fn confirm_postman_import(&mut self) {
+        let path = std::path::Path::new(self.postman_import_buffer.trim());
+        let Some(result) = postman::import(path) else {
+            self.postman_import_error = true;
+            return;
+        };
+
+        self.folders.extend(result.folders);
+        self.requests.extend(result.requests);
+        self.save_collections();
+
+        self.postman_import_open = false;
     }
 
     // -- History --
