@@ -314,8 +314,14 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
                     app.sidebar_selected = app.sidebar_selected.saturating_sub(1);
                 }
                 KeyCode::Enter => {
+                    let is_folder = matches!(
+                        app.selected_sidebar_item(),
+                        Some(app::SidebarItem::Folder(_))
+                    );
                     app.load_selected();
-                    app.focus = Focus::UrlBar;
+                    if !is_folder {
+                        app.focus = Focus::UrlBar;
+                    }
                 }
                 KeyCode::Tab => app.focus = Focus::UrlBar,
                 _ => {}
