@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
+/// Configuration for an outgoing HTTP request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequestOptions {
     pub method: String,
@@ -11,6 +12,7 @@ pub struct RequestOptions {
     pub body: Option<String>,
 }
 
+/// Parsed HTTP response with status, headers, body and timing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HttpResponse {
     pub status: u16,
@@ -20,6 +22,7 @@ pub struct HttpResponse {
     pub duration_ms: u128,
 }
 
+/// Sends a blocking HTTP request and returns the parsed response.
 pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
     let client = Client::builder()
         .timeout(Duration::from_secs(30))
@@ -52,11 +55,13 @@ pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
     let mut headers = HashMap::new();
     for (k, v) in resp.headers() {
         if let Ok(val) = v.to_str() {
-            headers.insert(k.to_string(), val.to_string());
+            headers.insert(k.to_string(), val.to_owned());
         }
     }
 
-    let body = resp.text().map_err(|e| format!("Failed to read body: {e}"))?;
+    let body = resp
+        .text()
+        .map_err(|e| format!("Failed to read body: {e}"))?;
 
     Ok(HttpResponse {
         status,
