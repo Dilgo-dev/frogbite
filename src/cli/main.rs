@@ -129,6 +129,12 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
     if app.view == View::Settings {
         return handle_settings_key(app, key.code);
     }
+    if app.curl_export_open {
+        if key.code == KeyCode::Esc {
+            app.curl_export_open = false;
+        }
+        return false;
+    }
     if app.curl_import_open {
         handle_curl_import_key(app, key);
         return false;
@@ -304,6 +310,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
                 KeyCode::Char('d') => app.request_delete(),
                 KeyCode::Char('D') => app.duplicate_request(),
                 KeyCode::Char('i') => app.open_curl_import(),
+                KeyCode::Char('c') => app.open_curl_export(),
                 KeyCode::Char('j') | KeyCode::Down => {
                     let max = app.sidebar_len().saturating_sub(1);
                     if app.sidebar_selected < max {

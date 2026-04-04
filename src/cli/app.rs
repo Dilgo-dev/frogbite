@@ -116,6 +116,8 @@ pub struct App {
     pub curl_import_open: bool,
     pub curl_import_buffer: String,
     pub curl_import_error: bool,
+    pub curl_export_open: bool,
+    pub curl_export_content: String,
 }
 
 impl App {
@@ -169,6 +171,8 @@ impl App {
             curl_import_open: false,
             curl_import_buffer: String::new(),
             curl_import_error: false,
+            curl_export_open: false,
+            curl_export_content: String::new(),
         };
 
         if let Some(id) = &app.active_request_id.clone() {
@@ -704,6 +708,12 @@ impl App {
 
         self.curl_import_open = false;
         self.focus = Focus::UrlBar;
+    }
+
+    pub fn open_curl_export(&mut self) {
+        self.curl_export_content =
+            curl::export(self.method.as_str(), &self.url, &self.headers, &self.body);
+        self.curl_export_open = true;
     }
 
     // -- History --

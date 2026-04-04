@@ -81,6 +81,21 @@ pub fn parse(input: &str) -> Option<ParsedCurl> {
     })
 }
 
+pub fn export(method: &str, url: &str, headers: &HashMap<String, String>, body: &str) -> String {
+    let mut parts = vec![format!("curl -X {method} '{url}'")];
+
+    for (key, value) in headers {
+        parts.push(format!("  -H '{key}: {value}'"));
+    }
+
+    if !body.is_empty() {
+        let escaped = body.replace('\'', "'\\''");
+        parts.push(format!("  -d '{escaped}'"));
+    }
+
+    parts.join(" \\\n")
+}
+
 fn tokenize(input: &str) -> Vec<String> {
     let normalized = input.replace("\\\n", " ").replace("\\\r\n", " ");
     let chars: Vec<char> = normalized.chars().collect();

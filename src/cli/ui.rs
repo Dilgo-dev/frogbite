@@ -80,6 +80,9 @@ fn draw_main(frame: &mut Frame, app: &App) {
     if app.curl_import_open {
         draw_curl_import_popup(frame, app);
     }
+    if app.curl_export_open {
+        draw_curl_export_popup(frame, app);
+    }
 }
 
 fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
@@ -711,6 +714,34 @@ fn draw_curl_import_popup(frame: &mut Frame, app: &App) {
     frame.render_widget(paragraph, inner);
 }
 
+fn draw_curl_export_popup(frame: &mut Frame, app: &App) {
+    let area = frame.area();
+    let popup_w = area.width.saturating_sub(10).min(80);
+    let popup_h = area.height.saturating_sub(6).min(16);
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .title(" Export cURL ")
+        .title_style(Style::default().fg(GREEN).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GREEN))
+        .bg(BG);
+
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    let paragraph = Paragraph::new(Text::styled(
+        &app.curl_export_content,
+        Style::default().fg(FG),
+    ))
+    .wrap(ratatui::widgets::Wrap { trim: false });
+    frame.render_widget(paragraph, inner);
+}
+
 fn draw_settings(frame: &mut Frame, app: &App) {
     let area = frame.area();
 
@@ -765,7 +796,9 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
     let area = frame.area();
     let help_area = Rect::new(0, area.height.saturating_sub(1), area.width, 1);
 
-    let help = if app.curl_import_open {
+    let help = if app.curl_export_open {
+        "Esc:close"
+    } else if app.curl_import_open {
         "paste cURL  Ctrl+S:import  Esc:cancel"
     } else if app.method_popup {
         "j/k:navigate  Enter:select  Esc:cancel"
@@ -782,7 +815,7 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
             View::Main if app.confirm_delete => "d:confirm delete  any:cancel",
             View::Main => match app.focus {
                 Focus::Sidebar => {
-                    "j/k:nav  Enter:open  a:new  A:folder  d:del  D:dup  r:rename  m:method  i:curl  q:quit"
+                    "j/k:nav  Enter:open  a:new  d:del  D:dup  r:rename  m:method  i:import  c:export  q:quit"
                 }
                 Focus::UrlBar => "e:edit  m:method  Enter:send  h:history  s:settings",
                 Focus::Body => "e:edit  Enter:send  h:history  s:settings",
