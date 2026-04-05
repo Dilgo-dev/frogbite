@@ -1590,8 +1590,14 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
                 Focus::UrlBar => {
                     "e:edit  m:method  A:auth  Enter:send  h:history  E:env  s:settings"
                 }
-                Focus::Body => "e:edit  A:auth  Enter:send  h:history  E:env  s:settings",
-                Focus::Response => "j/k:scroll  1:body 2:headers  A:auth  h:history  E:env",
+                Focus::Body => match app.request_tab {
+                    RequestTab::Body => "1-4:tabs  e:edit  Enter:send  q:quit",
+                    RequestTab::Headers | RequestTab::Params => {
+                        "1-4:tabs  j/k:nav  e:edit  a:add  d:del  Enter:send"
+                    }
+                    RequestTab::Auth => "1-4:tabs  t:type  e:edit  Enter:send",
+                },
+                Focus::Response => "j/k:scroll  1:body 2:headers  h:history  E:env",
             },
         }
     };
