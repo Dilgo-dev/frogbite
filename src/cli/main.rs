@@ -1,6 +1,7 @@
 mod app;
 mod collections;
 mod curl;
+mod environments;
 mod history;
 mod postman;
 mod settings;
@@ -129,6 +130,22 @@ fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> 
 fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
     if app.view == View::Settings {
         return handle_settings_key(app, key.code);
+    }
+    if app.env_editing_var {
+        handle_env_var_edit_key(app, key.code);
+        return false;
+    }
+    if app.env_editor_open {
+        handle_env_editor_key(app, key.code);
+        return false;
+    }
+    if app.env_renaming {
+        handle_env_rename_key(app, key.code);
+        return false;
+    }
+    if app.env_popup_open {
+        handle_env_popup_key(app, key.code);
+        return false;
     }
     if app.curl_export_open {
         if key.code == KeyCode::Esc {
@@ -306,6 +323,83 @@ fn handle_body_edit_key(app: &mut App, key: KeyCode) {
     }
 }
 
+fn handle_env_popup_key(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Esc => app.env_popup_open = false,
+        KeyCode::Char('j') | KeyCode::Down => {
+            let max = app.env_popup_count().saturating_sub(1);
+            if app.env_popup_selected < max {
+                app.env_popup_selected += 1;
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.env_popup_selected = app.env_popup_selected.saturating_sub(1);
+        }
+        KeyCode::Enter => app.select_env_from_popup(),
+        KeyCode::Char('a') => app.create_environment(),
+        KeyCode::Char('d') => app.delete_env_from_popup(),
+        KeyCode::Char('r') => app.start_env_rename(),
+        KeyCode::Char('e') => app.open_env_editor(),
+        _ => {}
+    }
+}
+
+fn handle_env_rename_key(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Esc => app.cancel_env_rename(),
+        KeyCode::Enter => app.confirm_env_rename(),
+        KeyCode::Backspace => {
+            app.env_name_buffer.pop();
+        }
+        KeyCode::Char(c) => app.env_name_buffer.push(c),
+        _ => {}
+    }
+}
+
+fn handle_env_editor_key(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Esc => {
+            app.env_editor_open = false;
+            app.env_popup_open = true;
+        }
+        KeyCode::Char('j') | KeyCode::Down => {
+            let max = app.env_editor_count().saturating_sub(1);
+            if app.env_editor_selected < max {
+                app.env_editor_selected += 1;
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.env_editor_selected = app.env_editor_selected.saturating_sub(1);
+        }
+        KeyCode::Char('a') | KeyCode::Enter => app.start_edit_var(),
+        KeyCode::Char('d') => app.delete_var(),
+        _ => {}
+    }
+}
+
+fn handle_env_var_edit_key(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Esc => app.env_editing_var = false,
+        KeyCode::Tab => app.env_var_field = 1 - app.env_var_field,
+        KeyCode::Enter => app.confirm_var_edit(),
+        KeyCode::Backspace => {
+            if app.env_var_field == 0 {
+                app.env_var_key_buffer.pop();
+            } else {
+                app.env_var_value_buffer.pop();
+            }
+        }
+        KeyCode::Char(c) => {
+            if app.env_var_field == 0 {
+                app.env_var_key_buffer.push(c);
+            } else {
+                app.env_var_value_buffer.push(c);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Returns `true` when the app should quit.
 fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
     match app.focus {
@@ -324,6 +418,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
                 }
                 KeyCode::Char('s') => app.view = View::Settings,
                 KeyCode::Char('h') => app.open_history(),
+                KeyCode::Char('E') => app.open_env_popup(),
                 KeyCode::Char('r') => app.start_editing_name(),
                 KeyCode::Char('m') => app.cycle_sidebar_method(),
                 KeyCode::Char('a') => app.create_request(),
@@ -360,6 +455,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('q') => return true,
             KeyCode::Char('s') => app.view = View::Settings,
             KeyCode::Char('h') => app.open_history(),
+            KeyCode::Char('E') => app.open_env_popup(),
             KeyCode::Char('e' | 'i') => {
                 app.editing_url = true;
                 app.cursor_pos = app.url.len();
@@ -374,6 +470,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('q') => return true,
             KeyCode::Char('s') => app.view = View::Settings,
             KeyCode::Char('h') => app.open_history(),
+            KeyCode::Char('E') => app.open_env_popup(),
             KeyCode::Char('e' | 'i') => app.enter_body_edit(),
             KeyCode::Enter => app.send_request(),
             KeyCode::Tab => app.focus = Focus::Response,
@@ -384,6 +481,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('q') => return true,
             KeyCode::Char('s') => app.view = View::Settings,
             KeyCode::Char('h') => app.open_history(),
+            KeyCode::Char('E') => app.open_env_popup(),
             KeyCode::Char('j') | KeyCode::Down => {
                 app.response_scroll = app.response_scroll.saturating_add(1);
             }

@@ -4,6 +4,7 @@ use frogbite::core::http::{HttpResponse, RequestOptions};
 
 use crate::collections::{self, CollectionData, Folder, SavedRequest};
 use crate::curl;
+use crate::environments::{self, Environment, Variable};
 use crate::history::{self, HistoryEntry};
 use crate::postman;
 use crate::settings::{self, Settings};
@@ -122,6 +123,19 @@ pub struct App {
     pub postman_import_open: bool,
     pub postman_import_buffer: String,
     pub postman_import_error: bool,
+    pub environments: Vec<Environment>,
+    pub active_env_id: Option<String>,
+    pub env_popup_open: bool,
+    pub env_popup_selected: usize,
+    pub env_editor_open: bool,
+    pub env_editor_id: String,
+    pub env_editor_selected: usize,
+    pub env_editing_var: bool,
+    pub env_var_key_buffer: String,
+    pub env_var_value_buffer: String,
+    pub env_var_field: usize,
+    pub env_renaming: bool,
+    pub env_name_buffer: String,
 }
 
 impl App {
@@ -129,6 +143,7 @@ impl App {
         let settings = settings::load();
         let hist = history::load();
         let data = collections::load();
+        let env_data = environments::load();
 
         let (folders, requests, active_id) = if data.requests.is_empty() {
             let defaults = default_collection();
@@ -180,6 +195,19 @@ impl App {
             postman_import_open: false,
             postman_import_buffer: String::new(),
             postman_import_error: false,
+            environments: env_data.environments,
+            active_env_id: env_data.active_id,
+            env_popup_open: false,
+            env_popup_selected: 0,
+            env_editor_open: false,
+            env_editor_id: String::new(),
+            env_editor_selected: 0,
+            env_editing_var: false,
+            env_var_key_buffer: String::new(),
+            env_var_value_buffer: String::new(),
+            env_var_field: 0,
+            env_renaming: false,
+            env_name_buffer: String::new(),
         };
 
         if let Some(id) = &app.active_request_id.clone() {
@@ -766,6 +794,219 @@ impl App {
         }
     }
 
+    // -- Environments --
+
+    pub fn save_environments(&self) {
+        let data = environments::EnvironmentData {
+            environments: self.environments.clone(),
+            active_id: self.active_env_id.clone(),
+        };
+        environments::save(&data);
+    }
+
+    pub fn active_env_name(&self) -> Option<&str> {
+        let id = self.active_env_id.as_ref()?;
+        self.environments
+            .iter()
+            .find(|e| e.id == *id)
+            .map(|e| e.name.as_str())
+    }
+
+    pub const fn open_env_popup(&mut self) {
+        self.env_popup_selected = 0;
+        self.env_popup_open = true;
+    }
+
+    pub fn env_popup_count(&self) -> usize {
+        self.environments.len() + 1
+    }
+
+    pub fn select_env_from_popup(&mut self) {
+        if self.env_popup_selected == 0 {
+            self.active_env_id = None;
+        } else {
+            let idx = self.env_popup_selected - 1;
+            if let Some(env) = self.environments.get(idx) {
+                self.active_env_id = Some(env.id.clone());
+            }
+        }
+        self.save_environments();
+        self.env_popup_open = false;
+    }
+
+    pub fn create_environment(&mut self) {
+        let env = Environment {
+            id: collections::new_id(),
+            name: String::new(),
+            variables: Vec::new(),
+        };
+        self.environments.push(env);
+        self.env_popup_selected = self.environments.len();
+        self.env_name_buffer = String::new();
+        self.env_renaming = true;
+        self.save_environments();
+    }
+
+    pub fn delete_env_from_popup(&mut self) {
+        if self.env_popup_selected == 0 {
+            return;
+        }
+        let idx = self.env_popup_selected - 1;
+        if idx < self.environments.len() {
+            let removed_id = self.environments[idx].id.clone();
+            self.environments.remove(idx);
+            if self.active_env_id.as_deref() == Some(&removed_id) {
+                self.active_env_id = None;
+            }
+            let max = self.env_popup_count().saturating_sub(1);
+            if self.env_popup_selected > max {
+                self.env_popup_selected = max;
+            }
+            self.save_environments();
+        }
+    }
+
+    pub fn start_env_rename(&mut self) {
+        if self.env_popup_selected == 0 {
+            return;
+        }
+        let idx = self.env_popup_selected - 1;
+        if let Some(env) = self.environments.get(idx) {
+            self.env_name_buffer = env.name.clone();
+            self.env_renaming = true;
+        }
+    }
+
+    pub fn confirm_env_rename(&mut self) {
+        if self.env_popup_selected == 0 {
+            self.env_renaming = false;
+            return;
+        }
+        let idx = self.env_popup_selected - 1;
+        if self.env_name_buffer.trim().is_empty() {
+            self.cancel_env_rename();
+            return;
+        }
+        if let Some(env) = self.environments.get_mut(idx) {
+            env.name.clone_from(&self.env_name_buffer);
+        }
+        self.env_renaming = false;
+        self.save_environments();
+    }
+
+    pub fn cancel_env_rename(&mut self) {
+        if self.env_popup_selected > 0 {
+            let idx = self.env_popup_selected - 1;
+            if idx < self.environments.len() && self.environments[idx].name.is_empty() {
+                self.environments.remove(idx);
+                let max = self.env_popup_count().saturating_sub(1);
+                if self.env_popup_selected > max {
+                    self.env_popup_selected = max;
+                }
+                self.save_environments();
+            }
+        }
+        self.env_renaming = false;
+    }
+
+    pub fn open_env_editor(&mut self) {
+        if self.env_popup_selected == 0 {
+            return;
+        }
+        let idx = self.env_popup_selected - 1;
+        if let Some(env) = self.environments.get(idx) {
+            self.env_editor_id = env.id.clone();
+            self.env_editor_selected = 0;
+            self.env_popup_open = false;
+            self.env_editor_open = true;
+        }
+    }
+
+    fn edited_env(&self) -> Option<&Environment> {
+        self.environments
+            .iter()
+            .find(|e| e.id == self.env_editor_id)
+    }
+
+    pub fn env_editor_count(&self) -> usize {
+        self.edited_env().map_or(1, |e| e.variables.len() + 1)
+    }
+
+    pub fn start_add_var(&mut self) {
+        self.env_var_key_buffer.clear();
+        self.env_var_value_buffer.clear();
+        self.env_var_field = 0;
+        self.env_editing_var = true;
+    }
+
+    pub fn start_edit_var(&mut self) {
+        let id = self.env_editor_id.clone();
+        let Some(env) = self.environments.iter().find(|e| e.id == id) else {
+            return;
+        };
+        if self.env_editor_selected >= env.variables.len() {
+            self.start_add_var();
+            return;
+        }
+        self.env_var_key_buffer = env.variables[self.env_editor_selected].key.clone();
+        self.env_var_value_buffer = env.variables[self.env_editor_selected].value.clone();
+        self.env_var_field = 0;
+        self.env_editing_var = true;
+    }
+
+    pub fn confirm_var_edit(&mut self) {
+        if self.env_var_key_buffer.trim().is_empty() {
+            self.env_editing_var = false;
+            return;
+        }
+        let id = self.env_editor_id.clone();
+        let Some(env) = self.environments.iter_mut().find(|e| e.id == id) else {
+            return;
+        };
+        if self.env_editor_selected < env.variables.len() {
+            let var = &mut env.variables[self.env_editor_selected];
+            var.key.clone_from(&self.env_var_key_buffer);
+            var.value.clone_from(&self.env_var_value_buffer);
+        } else {
+            env.variables.push(Variable {
+                key: self.env_var_key_buffer.clone(),
+                value: self.env_var_value_buffer.clone(),
+            });
+        }
+        self.env_editing_var = false;
+        self.save_environments();
+    }
+
+    pub fn delete_var(&mut self) {
+        let id = self.env_editor_id.clone();
+        let Some(env) = self.environments.iter_mut().find(|e| e.id == id) else {
+            return;
+        };
+        if self.env_editor_selected < env.variables.len() {
+            env.variables.remove(self.env_editor_selected);
+            let max = env.variables.len();
+            if self.env_editor_selected > max {
+                self.env_editor_selected = max;
+            }
+            self.save_environments();
+        }
+    }
+
+    fn resolve_variables(&self, input: &str) -> String {
+        let Some(env_id) = &self.active_env_id else {
+            return input.to_owned();
+        };
+        let Some(env) = self.environments.iter().find(|e| e.id == *env_id) else {
+            return input.to_owned();
+        };
+        let mut result = input.to_owned();
+        for var in &env.variables {
+            let pattern = format!("{{{{{}}}}}", var.key);
+            result = result.replace(&pattern, &var.value);
+        }
+        result
+    }
+
     // -- Request --
 
     pub fn send_request(&mut self) {
@@ -773,14 +1014,22 @@ impl App {
         self.response_scroll = 0;
         self.sync_to_collection();
 
+        let resolved_url = self.resolve_variables(&self.url);
+        let resolved_body = self.resolve_variables(&self.body);
+        let resolved_headers: HashMap<String, String> = self
+            .headers
+            .iter()
+            .map(|(k, v)| (k.clone(), self.resolve_variables(v)))
+            .collect();
+
         let opts = RequestOptions {
             method: self.method.as_str().to_owned(),
-            url: self.url.clone(),
-            headers: self.headers.clone(),
-            body: if self.body.is_empty() {
+            url: resolved_url,
+            headers: resolved_headers,
+            body: if resolved_body.is_empty() {
                 None
             } else {
-                Some(self.body.clone())
+                Some(resolved_body)
             },
         };
 

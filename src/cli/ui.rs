@@ -86,24 +86,35 @@ fn draw_main(frame: &mut Frame, app: &App) {
     if app.postman_import_open {
         draw_postman_import_popup(frame, app);
     }
+    if app.env_popup_open || app.env_renaming {
+        draw_env_popup(frame, app);
+    }
+    if app.env_editor_open {
+        draw_env_editor(frame, app);
+    }
 }
 
 fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
     let is_focused = app.focus == Focus::Sidebar;
 
+    let env_label = app.active_env_name().map(|n| format!(" frogbite [{n}] "));
     let title = if app.confirm_delete {
-        " Delete? (d=yes, Esc=no) "
+        " Delete? (d=yes, Esc=no) ".to_owned()
     } else {
-        " frogbite "
+        env_label.unwrap_or_else(|| " frogbite ".to_owned())
+    };
+
+    let title_style = if app.confirm_delete {
+        Style::default().fg(RED).bold()
+    } else if app.active_env_id.is_some() {
+        Style::default().fg(TEAL).bold()
+    } else {
+        Style::default().fg(GREEN).bold()
     };
 
     let block = Block::default()
         .title(title)
-        .title_style(if app.confirm_delete {
-            Style::default().fg(RED).bold()
-        } else {
-            Style::default().fg(GREEN).bold()
-        })
+        .title_style(title_style)
         .borders(Borders::ALL)
         .border_style(if is_focused {
             Style::default().fg(GREEN)
@@ -793,6 +804,251 @@ fn draw_postman_import_popup(frame: &mut Frame, app: &App) {
     frame.render_widget(paragraph, inner);
 }
 
+fn draw_env_popup(frame: &mut Frame, app: &App) {
+    let count = app.env_popup_count();
+    let popup_h = (count as u16 + 2).min(20);
+    let popup_w: u16 = 40;
+
+    let area = frame.area();
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .title(" Environments ")
+        .title_style(Style::default().fg(TEAL).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(TEAL))
+        .bg(BG);
+
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    // First row: "No environment"
+    let row_y = inner.y;
+    if row_y < inner.y + inner.height {
+        let row = Rect::new(inner.x, row_y, inner.width, 1);
+        let selected = app.env_popup_selected == 0;
+        let is_active = app.active_env_id.is_none();
+
+        if selected {
+            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+        }
+
+        let dot = if is_active { "\u{25cf}" } else { "\u{25cb}" };
+        let line = Line::from(vec![
+            Span::styled(
+                if selected { " > " } else { "   " },
+                Style::default().fg(TEAL),
+            ),
+            Span::styled(format!("{dot} "), Style::default().fg(MUTED)),
+            Span::styled(
+                "No environment",
+                if selected {
+                    Style::default().fg(FG).italic()
+                } else {
+                    Style::default().fg(MUTED).italic()
+                },
+            ),
+        ]);
+        frame.render_widget(Paragraph::new(line), row);
+    }
+
+    // Environment rows
+    for (i, env) in app.environments.iter().enumerate() {
+        let row_y = inner.y + (i as u16 + 1);
+        if row_y >= inner.y + inner.height {
+            break;
+        }
+        let row = Rect::new(inner.x, row_y, inner.width, 1);
+        let idx = i + 1;
+        let selected = app.env_popup_selected == idx;
+        let is_active = app.active_env_id.as_deref() == Some(&env.id);
+
+        if selected {
+            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+        }
+
+        let dot = if is_active { "\u{25cf}" } else { "\u{25cb}" };
+        let name = if app.env_renaming && selected {
+            format!("{}\u{2588}", &app.env_name_buffer)
+        } else {
+            env.name.clone()
+        };
+        let name_style = if app.env_renaming && selected {
+            Style::default().fg(TEAL)
+        } else if selected {
+            Style::default().fg(FG)
+        } else if is_active {
+            Style::default().fg(TEAL)
+        } else {
+            Style::default().fg(MUTED)
+        };
+
+        let line = Line::from(vec![
+            Span::styled(
+                if selected { " > " } else { "   " },
+                Style::default().fg(TEAL),
+            ),
+            Span::styled(
+                format!("{dot} "),
+                if is_active {
+                    Style::default().fg(TEAL)
+                } else {
+                    Style::default().fg(MUTED)
+                },
+            ),
+            Span::styled(name, name_style),
+        ]);
+        frame.render_widget(Paragraph::new(line), row);
+    }
+}
+
+fn draw_env_editor(frame: &mut Frame, app: &App) {
+    let env = app.environments.iter().find(|e| e.id == app.env_editor_id);
+    let env_name = env.map_or("?", |e| &e.name);
+    let vars = env.map_or(&[][..], |e| &e.variables);
+
+    let area = frame.area();
+    let popup_w = area.width.saturating_sub(10).min(70);
+    let popup_h = area.height.saturating_sub(6).min(25);
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let title = format!(" {env_name} - Variables ");
+    let block = Block::default()
+        .title(title)
+        .title_style(Style::default().fg(TEAL).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(TEAL))
+        .bg(BG);
+
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    if app.env_editing_var {
+        draw_env_var_edit(frame, app, inner);
+        return;
+    }
+
+    for (i, var) in vars.iter().enumerate() {
+        let row_y = inner.y + i as u16;
+        if row_y >= inner.y + inner.height {
+            break;
+        }
+        let row = Rect::new(inner.x, row_y, inner.width, 1);
+        let selected = i == app.env_editor_selected;
+
+        if selected {
+            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+        }
+
+        let line = Line::from(vec![
+            Span::styled(
+                if selected { " > " } else { "   " },
+                Style::default().fg(TEAL),
+            ),
+            Span::styled(&var.key, Style::default().fg(TEAL).bold()),
+            Span::styled(" = ", Style::default().fg(MUTED)),
+            Span::styled(
+                &var.value,
+                if selected {
+                    Style::default().fg(FG)
+                } else {
+                    Style::default().fg(MUTED)
+                },
+            ),
+        ]);
+        frame.render_widget(Paragraph::new(line), row);
+    }
+
+    let add_y = inner.y + vars.len() as u16;
+    if add_y < inner.y + inner.height {
+        let row = Rect::new(inner.x, add_y, inner.width, 1);
+        let selected = app.env_editor_selected >= vars.len();
+
+        if selected {
+            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+        }
+
+        let line = Line::from(Span::styled(
+            "   + add variable",
+            if selected {
+                Style::default().fg(TEAL)
+            } else {
+                Style::default().fg(MUTED)
+            },
+        ));
+        frame.render_widget(Paragraph::new(line), row);
+    }
+}
+
+fn draw_env_var_edit(frame: &mut Frame, app: &App, parent: Rect) {
+    let edit_h: u16 = 7;
+    let edit_w: u16 = 50.min(parent.width);
+    let ex = parent.x + (parent.width.saturating_sub(edit_w)) / 2;
+    let ey = parent.y + (parent.height.saturating_sub(edit_h)) / 2;
+    let edit_area = Rect::new(ex, ey, edit_w, edit_h);
+
+    frame.render_widget(Clear, edit_area);
+
+    let edit_block = Block::default()
+        .title(" Edit Variable ")
+        .title_style(Style::default().fg(GREEN).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GREEN))
+        .bg(BG);
+
+    let edit_inner = edit_block.inner(edit_area);
+    frame.render_widget(edit_block, edit_area);
+
+    let key_style = if app.env_var_field == 0 {
+        Style::default().fg(GREEN)
+    } else {
+        Style::default().fg(FG)
+    };
+    let val_style = if app.env_var_field == 1 {
+        Style::default().fg(GREEN)
+    } else {
+        Style::default().fg(FG)
+    };
+
+    let key_display = if app.env_var_field == 0 {
+        format!("{}\u{2588}", &app.env_var_key_buffer)
+    } else {
+        app.env_var_key_buffer.clone()
+    };
+    let val_display = if app.env_var_field == 1 {
+        format!("{}\u{2588}", &app.env_var_value_buffer)
+    } else {
+        app.env_var_value_buffer.clone()
+    };
+
+    let lines = vec![
+        Line::from(vec![
+            Span::styled("  Key:   ", Style::default().fg(MUTED)),
+            Span::styled(key_display, key_style),
+        ]),
+        Line::default(),
+        Line::from(vec![
+            Span::styled("  Value: ", Style::default().fg(MUTED)),
+            Span::styled(val_display, val_style),
+        ]),
+        Line::default(),
+        Line::from(Span::styled(
+            "  Tab:switch  Enter:save  Esc:cancel",
+            Style::default().fg(MUTED),
+        )),
+    ];
+    let paragraph = Paragraph::new(Text::from(lines));
+    frame.render_widget(paragraph, edit_inner);
+}
+
 fn draw_settings(frame: &mut Frame, app: &App) {
     let area = frame.area();
 
@@ -847,7 +1103,15 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
     let area = frame.area();
     let help_area = Rect::new(0, area.height.saturating_sub(1), area.width, 1);
 
-    let help = if app.postman_import_open {
+    let help = if app.env_editing_var {
+        "type key/value  Tab:switch field  Enter:save  Esc:cancel"
+    } else if app.env_editor_open {
+        "j/k:navigate  Enter/a:edit  d:delete  Esc:back"
+    } else if app.env_renaming {
+        "type name  Enter:confirm  Esc:cancel"
+    } else if app.env_popup_open {
+        "j/k:nav  Enter:select  a:new  d:del  r:rename  e:edit vars  Esc:close"
+    } else if app.postman_import_open {
         "type path  Enter:import  Esc:cancel"
     } else if app.curl_export_open {
         "Esc:close"
@@ -868,11 +1132,11 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
             View::Main if app.confirm_delete => "d:confirm delete  any:cancel",
             View::Main => match app.focus {
                 Focus::Sidebar => {
-                    "j/k:nav  a:new  d:del  D:dup  r:rename  i:curl  I:postman  c:export  q:quit"
+                    "j/k:nav  a:new  d:del  D:dup  r:rename  i:curl  I:postman  E:env  q:quit"
                 }
-                Focus::UrlBar => "e:edit  m:method  Enter:send  h:history  s:settings",
-                Focus::Body => "e:edit  Enter:send  h:history  s:settings",
-                Focus::Response => "j/k:scroll  1:body 2:headers  h:history  s:settings",
+                Focus::UrlBar => "e:edit  m:method  Enter:send  h:history  E:env  s:settings",
+                Focus::Body => "e:edit  Enter:send  h:history  E:env  s:settings",
+                Focus::Response => "j/k:scroll  1:body 2:headers  h:history  E:env  s:settings",
             },
         }
     };
