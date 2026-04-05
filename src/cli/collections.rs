@@ -4,6 +4,25 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+/// Authentication configuration for a request.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(tag = "type")]
+pub enum Auth {
+    #[default]
+    None,
+    Bearer {
+        token: String,
+    },
+    Basic {
+        username: String,
+        password: String,
+    },
+    ApiKey {
+        header: String,
+        value: String,
+    },
+}
+
 /// A saved request in a collection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SavedRequest {
@@ -15,6 +34,8 @@ pub struct SavedRequest {
     #[serde(default)]
     pub headers: HashMap<String, String>,
     pub folder_id: Option<String>,
+    #[serde(default)]
+    pub auth: Auth,
 }
 
 /// A folder grouping requests.

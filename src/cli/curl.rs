@@ -142,7 +142,7 @@ fn tokenize(input: &str) -> Vec<String> {
     tokens
 }
 
-fn base64(input: &[u8]) -> String {
+pub fn base64(input: &[u8]) -> String {
     const TABLE: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::new();
     let mut i = 0;

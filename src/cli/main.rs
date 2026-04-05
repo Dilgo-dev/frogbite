@@ -131,6 +131,14 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
     if app.view == View::Settings {
         return handle_settings_key(app, key.code);
     }
+    if app.auth_editing {
+        handle_auth_edit_key(app, key.code);
+        return false;
+    }
+    if app.auth_popup_open {
+        handle_auth_popup_key(app, key.code);
+        return false;
+    }
     if app.env_editing_var {
         handle_env_var_edit_key(app, key.code);
         return false;
@@ -327,6 +335,46 @@ fn handle_body_edit_key(app: &mut App, key: KeyCode) {
     }
 }
 
+fn handle_auth_popup_key(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Esc => app.auth_popup_open = false,
+        KeyCode::Char('j') | KeyCode::Down => {
+            if app.auth_popup_selected < App::AUTH_TYPES.len() - 1 {
+                app.auth_popup_selected += 1;
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.auth_popup_selected = app.auth_popup_selected.saturating_sub(1);
+        }
+        KeyCode::Enter => app.select_auth_type(),
+        _ => {}
+    }
+}
+
+fn handle_auth_edit_key(app: &mut App, key: KeyCode) {
+    let has_two_fields = !matches!(&app.auth, collections::Auth::Bearer { .. });
+    match key {
+        KeyCode::Esc => app.auth_editing = false,
+        KeyCode::Tab if has_two_fields => app.auth_field = 1 - app.auth_field,
+        KeyCode::Enter => app.confirm_auth_edit(),
+        KeyCode::Backspace => {
+            if app.auth_field == 0 {
+                app.auth_buf_a.pop();
+            } else {
+                app.auth_buf_b.pop();
+            }
+        }
+        KeyCode::Char(c) => {
+            if app.auth_field == 0 {
+                app.auth_buf_a.push(c);
+            } else {
+                app.auth_buf_b.push(c);
+            }
+        }
+        _ => {}
+    }
+}
+
 fn handle_env_popup_key(app: &mut App, key: KeyCode) {
     match key {
         KeyCode::Esc => app.env_popup_open = false,
@@ -478,6 +526,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('s') => app.view = View::Settings,
             KeyCode::Char('h') => app.open_history(),
             KeyCode::Char('E') => app.open_env_popup(),
+            KeyCode::Char('A') => app.open_auth_popup(),
             KeyCode::Char('e' | 'i') => {
                 app.editing_url = true;
                 app.cursor_pos = app.url.len();
@@ -493,6 +542,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('s') => app.view = View::Settings,
             KeyCode::Char('h') => app.open_history(),
             KeyCode::Char('E') => app.open_env_popup(),
+            KeyCode::Char('A') => app.open_auth_popup(),
             KeyCode::Char('e' | 'i') => app.enter_body_edit(),
             KeyCode::Enter => app.send_request(),
             KeyCode::Tab => app.focus = Focus::Response,
@@ -504,6 +554,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('s') => app.view = View::Settings,
             KeyCode::Char('h') => app.open_history(),
             KeyCode::Char('E') => app.open_env_popup(),
+            KeyCode::Char('A') => app.open_auth_popup(),
             KeyCode::Char('j') | KeyCode::Down => {
                 app.response_scroll = app.response_scroll.saturating_add(1);
             }

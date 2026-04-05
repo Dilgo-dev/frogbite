@@ -7,6 +7,7 @@ use ratatui::{
 };
 
 use crate::app::{App, Focus, Method, ResponseTab, SidebarItem, View};
+use crate::collections::Auth;
 
 const GREEN: Color = Color::Rgb(124, 179, 66);
 const ORANGE: Color = Color::Rgb(255, 111, 0);
@@ -94,6 +95,12 @@ fn draw_main(frame: &mut Frame, app: &App) {
     }
     if app.env_editor_open {
         draw_env_editor(frame, app);
+    }
+    if app.auth_popup_open {
+        draw_auth_popup(frame, app);
+    }
+    if app.auth_editing {
+        draw_auth_edit(frame, app);
     }
 }
 
@@ -233,8 +240,13 @@ fn draw_url_bar(frame: &mut Frame, app: &App, area: Rect) {
         ])
     };
 
+    let auth_label = match &app.auth {
+        Auth::None => " Request ".to_owned(),
+        _ => format!(" Request [{}] ", App::AUTH_TYPES[app.auth_type_index()]),
+    };
+
     let block = Block::default()
-        .title(" Request ")
+        .title(auth_label)
         .title_style(Style::default().fg(MUTED))
         .borders(Borders::ALL)
         .border_style(if is_focused {
@@ -1108,6 +1120,147 @@ fn draw_env_var_edit(frame: &mut Frame, app: &App, parent: Rect) {
     frame.render_widget(paragraph, edit_inner);
 }
 
+fn draw_auth_popup(frame: &mut Frame, app: &App) {
+    let types = App::AUTH_TYPES;
+    let popup_h = types.len() as u16 + 2;
+    let popup_w: u16 = 20;
+
+    let area = frame.area();
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .title(" Auth ")
+        .title_style(Style::default().fg(ORANGE).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ORANGE))
+        .bg(BG);
+
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    let current = app.auth_type_index();
+
+    for (i, label) in types.iter().enumerate() {
+        let row_y = inner.y + i as u16;
+        if row_y >= inner.y + inner.height {
+            break;
+        }
+        let row = Rect::new(inner.x, row_y, inner.width, 1);
+        let selected = i == app.auth_popup_selected;
+        let is_active = i == current;
+
+        if selected {
+            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+        }
+
+        let dot = if is_active { "\u{25cf}" } else { "\u{25cb}" };
+        let line = Line::from(vec![
+            Span::styled(
+                if selected { " > " } else { "   " },
+                Style::default().fg(ORANGE),
+            ),
+            Span::styled(
+                format!("{dot} "),
+                if is_active {
+                    Style::default().fg(ORANGE)
+                } else {
+                    Style::default().fg(MUTED)
+                },
+            ),
+            Span::styled(
+                *label,
+                if selected {
+                    Style::default().fg(FG)
+                } else {
+                    Style::default().fg(MUTED)
+                },
+            ),
+        ]);
+        frame.render_widget(Paragraph::new(line), row);
+    }
+}
+
+fn draw_auth_edit(frame: &mut Frame, app: &App) {
+    let (title, label_a, label_b) = match &app.auth {
+        Auth::Bearer { .. } => ("Bearer Token", "Token:  ", ""),
+        Auth::Basic { .. } => ("Basic Auth", "User:   ", "Pass:   "),
+        Auth::ApiKey { .. } => ("API Key", "Header: ", "Value:  "),
+        Auth::None => return,
+    };
+    let has_two = !label_b.is_empty();
+
+    let popup_h: u16 = if has_two { 8 } else { 5 };
+    let popup_w: u16 = 55;
+    let area = frame.area();
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .title(format!(" {title} "))
+        .title_style(Style::default().fg(ORANGE).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(ORANGE))
+        .bg(BG);
+
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    let style_a = if app.auth_field == 0 {
+        Style::default().fg(GREEN)
+    } else {
+        Style::default().fg(FG)
+    };
+    let buf_a = if app.auth_field == 0 {
+        format!("{}\u{2588}", &app.auth_buf_a)
+    } else {
+        app.auth_buf_a.clone()
+    };
+
+    let mut lines = vec![Line::from(vec![
+        Span::styled(format!("  {label_a}"), Style::default().fg(MUTED)),
+        Span::styled(buf_a, style_a),
+    ])];
+
+    if has_two {
+        let style_b = if app.auth_field == 1 {
+            Style::default().fg(GREEN)
+        } else {
+            Style::default().fg(FG)
+        };
+        let buf_b = if app.auth_field == 1 {
+            format!("{}\u{2588}", &app.auth_buf_b)
+        } else {
+            app.auth_buf_b.clone()
+        };
+        lines.push(Line::default());
+        lines.push(Line::from(vec![
+            Span::styled(format!("  {label_b}"), Style::default().fg(MUTED)),
+            Span::styled(buf_b, style_b),
+        ]));
+        lines.push(Line::default());
+        lines.push(Line::from(Span::styled(
+            "  Tab:switch  Enter:save  Esc:cancel",
+            Style::default().fg(MUTED),
+        )));
+    } else {
+        lines.push(Line::default());
+        lines.push(Line::from(Span::styled(
+            "  Enter:save  Esc:cancel",
+            Style::default().fg(MUTED),
+        )));
+    }
+
+    let paragraph = Paragraph::new(Text::from(lines));
+    frame.render_widget(paragraph, inner);
+}
+
 fn draw_settings(frame: &mut Frame, app: &App) {
     let area = frame.area();
 
@@ -1162,7 +1315,11 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
     let area = frame.area();
     let help_area = Rect::new(0, area.height.saturating_sub(1), area.width, 1);
 
-    let help = if app.env_editing_var {
+    let help = if app.auth_editing {
+        "type value  Tab:switch  Enter:save  Esc:cancel"
+    } else if app.auth_popup_open {
+        "j/k:navigate  Enter:select  Esc:close"
+    } else if app.env_editing_var {
         "type key/value  Tab:switch field  Enter:save  Esc:cancel"
     } else if app.env_editor_open {
         "j/k:navigate  Enter/a:edit  d:delete  s:secret  Esc:back"
@@ -1195,9 +1352,11 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
                 Focus::Sidebar => {
                     "j/k:nav  a:new  d:del  D:dup  r:rename  i:curl  I:postman  E:env  q:quit"
                 }
-                Focus::UrlBar => "e:edit  m:method  Enter:send  h:history  E:env  s:settings",
-                Focus::Body => "e:edit  Enter:send  h:history  E:env  s:settings",
-                Focus::Response => "j/k:scroll  1:body 2:headers  h:history  E:env  s:settings",
+                Focus::UrlBar => {
+                    "e:edit  m:method  A:auth  Enter:send  h:history  E:env  s:settings"
+                }
+                Focus::Body => "e:edit  A:auth  Enter:send  h:history  E:env  s:settings",
+                Focus::Response => "j/k:scroll  1:body 2:headers  A:auth  h:history  E:env",
             },
         }
     };

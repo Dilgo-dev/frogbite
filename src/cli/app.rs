@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use frogbite::core::http::{HttpResponse, RequestOptions};
 
-use crate::collections::{self, CollectionData, Folder, SavedRequest};
+use crate::collections::{self, Auth, CollectionData, Folder, SavedRequest};
 use crate::curl;
 use crate::environments::{self, Environment, Variable};
 use crate::history::{self, HistoryEntry};
@@ -139,6 +139,13 @@ pub struct App {
     pub env_import_open: bool,
     pub env_import_buffer: String,
     pub env_import_error: bool,
+    pub auth: Auth,
+    pub auth_popup_open: bool,
+    pub auth_popup_selected: usize,
+    pub auth_editing: bool,
+    pub auth_field: usize,
+    pub auth_buf_a: String,
+    pub auth_buf_b: String,
 }
 
 impl App {
@@ -214,6 +221,13 @@ impl App {
             env_import_open: false,
             env_import_buffer: String::new(),
             env_import_error: false,
+            auth: Auth::None,
+            auth_popup_open: false,
+            auth_popup_selected: 0,
+            auth_editing: false,
+            auth_field: 0,
+            auth_buf_a: String::new(),
+            auth_buf_b: String::new(),
         };
 
         if let Some(id) = &app.active_request_id.clone() {
@@ -331,6 +345,7 @@ impl App {
             self.url = req.url.clone();
             self.body = req.body.clone();
             self.headers = req.headers.clone();
+            self.auth = req.auth.clone();
             self.cursor_pos = self.url.len();
             self.body_row = 0;
             self.body_col = 0;
@@ -358,6 +373,7 @@ impl App {
             req.url.clone_from(&self.url);
             req.body.clone_from(&self.body);
             req.headers.clone_from(&self.headers);
+            req.auth.clone_from(&self.auth);
         }
         self.save_collections();
     }
@@ -433,6 +449,7 @@ impl App {
             body: String::new(),
             headers: HashMap::new(),
             folder_id,
+            auth: Auth::None,
         };
 
         let id = req.id.clone();
@@ -474,6 +491,7 @@ impl App {
                 body: req.body.clone(),
                 headers: req.headers.clone(),
                 folder_id: req.folder_id,
+                auth: req.auth,
             };
             let id = new_req.id.clone();
             self.requests.push(new_req);
@@ -732,6 +750,7 @@ impl App {
             body: parsed.body,
             headers: parsed.headers,
             folder_id,
+            auth: Auth::None,
         };
 
         let id = req.id.clone();
@@ -797,6 +816,128 @@ impl App {
             self.body_col = 0;
             self.response = None;
             self.history_open = false;
+        }
+    }
+
+    // -- Auth --
+
+    pub const AUTH_TYPES: &'static [&'static str] = &["None", "Bearer", "Basic", "API Key"];
+
+    pub const fn auth_type_index(&self) -> usize {
+        match &self.auth {
+            Auth::None => 0,
+            Auth::Bearer { .. } => 1,
+            Auth::Basic { .. } => 2,
+            Auth::ApiKey { .. } => 3,
+        }
+    }
+
+    pub const fn open_auth_popup(&mut self) {
+        self.auth_popup_selected = self.auth_type_index();
+        self.auth_popup_open = true;
+    }
+
+    pub fn select_auth_type(&mut self) {
+        self.auth_popup_open = false;
+        let new_auth = match self.auth_popup_selected {
+            1 => {
+                let token = if let Auth::Bearer { token } = &self.auth {
+                    token.clone()
+                } else {
+                    String::new()
+                };
+                Auth::Bearer { token }
+            }
+            2 => {
+                let (username, password) = if let Auth::Basic { username, password } = &self.auth {
+                    (username.clone(), password.clone())
+                } else {
+                    (String::new(), String::new())
+                };
+                Auth::Basic { username, password }
+            }
+            3 => {
+                let (header, value) = if let Auth::ApiKey { header, value } = &self.auth {
+                    (header.clone(), value.clone())
+                } else {
+                    ("X-API-Key".to_owned(), String::new())
+                };
+                Auth::ApiKey { header, value }
+            }
+            _ => Auth::None,
+        };
+        self.auth = new_auth;
+        self.sync_to_collection();
+
+        if self.auth != Auth::None {
+            self.open_auth_edit();
+        }
+    }
+
+    pub fn open_auth_edit(&mut self) {
+        self.auth_field = 0;
+        match &self.auth {
+            Auth::Bearer { token } => {
+                self.auth_buf_a = token.clone();
+                self.auth_buf_b.clear();
+            }
+            Auth::Basic { username, password } => {
+                self.auth_buf_a = username.clone();
+                self.auth_buf_b = password.clone();
+            }
+            Auth::ApiKey { header, value } => {
+                self.auth_buf_a = header.clone();
+                self.auth_buf_b = value.clone();
+            }
+            Auth::None => return,
+        }
+        self.auth_editing = true;
+    }
+
+    pub fn confirm_auth_edit(&mut self) {
+        match &self.auth {
+            Auth::Bearer { .. } => {
+                self.auth = Auth::Bearer {
+                    token: self.auth_buf_a.clone(),
+                };
+            }
+            Auth::Basic { .. } => {
+                self.auth = Auth::Basic {
+                    username: self.auth_buf_a.clone(),
+                    password: self.auth_buf_b.clone(),
+                };
+            }
+            Auth::ApiKey { .. } => {
+                self.auth = Auth::ApiKey {
+                    header: self.auth_buf_a.clone(),
+                    value: self.auth_buf_b.clone(),
+                };
+            }
+            Auth::None => {}
+        }
+        self.auth_editing = false;
+        self.sync_to_collection();
+    }
+
+    fn apply_auth_headers(&self, headers: &mut HashMap<String, String>) {
+        match &self.auth {
+            Auth::None => {}
+            Auth::Bearer { token } => {
+                let resolved = self.resolve_variables(token);
+                headers.insert("Authorization".to_owned(), format!("Bearer {resolved}"));
+            }
+            Auth::Basic { username, password } => {
+                let resolved_user = self.resolve_variables(username);
+                let resolved_pass = self.resolve_variables(password);
+                let encoded =
+                    crate::curl::base64(format!("{resolved_user}:{resolved_pass}").as_bytes());
+                headers.insert("Authorization".to_owned(), format!("Basic {encoded}"));
+            }
+            Auth::ApiKey { header, value } => {
+                let resolved_header = self.resolve_variables(header);
+                let resolved_value = self.resolve_variables(value);
+                headers.insert(resolved_header, resolved_value);
+            }
         }
     }
 
@@ -1065,11 +1206,12 @@ impl App {
 
         let resolved_url = self.resolve_variables(&self.url);
         let resolved_body = self.resolve_variables(&self.body);
-        let resolved_headers: HashMap<String, String> = self
+        let mut resolved_headers: HashMap<String, String> = self
             .headers
             .iter()
             .map(|(k, v)| (k.clone(), self.resolve_variables(v)))
             .collect();
+        self.apply_auth_headers(&mut resolved_headers);
 
         let opts = RequestOptions {
             method: self.method.as_str().to_owned(),
@@ -1150,6 +1292,7 @@ fn default_collection() -> CollectionData {
                 body: String::new(),
                 headers: HashMap::new(),
                 folder_id: Some(folder_id.clone()),
+                auth: Auth::None,
             },
             SavedRequest {
                 id: collections::new_id(),
@@ -1160,6 +1303,7 @@ fn default_collection() -> CollectionData {
                     .into(),
                 headers: HashMap::new(),
                 folder_id: Some(folder_id),
+                auth: Auth::None,
             },
         ],
         active_request_id: None,

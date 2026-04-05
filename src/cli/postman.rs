@@ -124,6 +124,7 @@ fn process_item(
             body,
             headers,
             folder_id,
+            auth: collections::Auth::None,
         });
     }
 }
