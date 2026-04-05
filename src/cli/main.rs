@@ -378,6 +378,7 @@ fn handle_env_editor_key(app: &mut App, key: KeyCode) {
         }
         KeyCode::Char('a') | KeyCode::Enter => app.start_edit_var(),
         KeyCode::Char('d') => app.delete_var(),
+        KeyCode::Char('s') => app.toggle_var_secret(),
         _ => {}
     }
 }

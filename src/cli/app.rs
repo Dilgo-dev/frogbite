@@ -1007,6 +1007,7 @@ impl App {
             env.variables.push(Variable {
                 key: self.env_var_key_buffer.clone(),
                 value: self.env_var_value_buffer.clone(),
+                secret: false,
             });
         }
         self.env_editing_var = false;
@@ -1024,6 +1025,18 @@ impl App {
             if self.env_editor_selected > max {
                 self.env_editor_selected = max;
             }
+            self.save_environments();
+        }
+    }
+
+    pub fn toggle_var_secret(&mut self) {
+        let id = self.env_editor_id.clone();
+        let Some(env) = self.environments.iter_mut().find(|e| e.id == id) else {
+            return;
+        };
+        if self.env_editor_selected < env.variables.len() {
+            let var = &mut env.variables[self.env_editor_selected];
+            var.secret = !var.secret;
             self.save_environments();
         }
     }

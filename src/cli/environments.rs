@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 pub struct Variable {
     pub key: String,
     pub value: String,
+    #[serde(default)]
+    pub secret: bool,
 }
 
 /// A named environment containing variables.
@@ -69,13 +71,32 @@ pub fn parse_dotenv(path: &std::path::Path) -> Option<Vec<Variable>> {
             continue;
         }
         let value = unquote(raw_value.trim());
+        let secret = is_secret_key(key);
         vars.push(Variable {
             key: key.to_owned(),
             value,
+            secret,
         });
     }
 
     Some(vars)
+}
+
+const SECRET_PATTERNS: &[&str] = &[
+    "secret",
+    "password",
+    "passwd",
+    "token",
+    "api_key",
+    "apikey",
+    "auth",
+    "credential",
+    "private",
+];
+
+fn is_secret_key(key: &str) -> bool {
+    let lower = key.to_ascii_lowercase();
+    SECRET_PATTERNS.iter().any(|p| lower.contains(p))
 }
 
 fn unquote(s: &str) -> String {

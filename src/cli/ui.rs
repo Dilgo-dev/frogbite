@@ -999,15 +999,23 @@ fn draw_env_editor(frame: &mut Frame, app: &App) {
             frame.render_widget(Paragraph::new("").bg(SURFACE), row);
         }
 
+        let display_value: String = if var.secret {
+            "\u{2022}".repeat(var.value.len().clamp(6, 20))
+        } else {
+            var.value.clone()
+        };
+        let secret_indicator = if var.secret { " \u{1f512}" } else { "" };
+
         let line = Line::from(vec![
             Span::styled(
                 if selected { " > " } else { "   " },
                 Style::default().fg(TEAL),
             ),
             Span::styled(&var.key, Style::default().fg(TEAL).bold()),
+            Span::styled(secret_indicator, Style::default().fg(YELLOW)),
             Span::styled(" = ", Style::default().fg(MUTED)),
             Span::styled(
-                &var.value,
+                display_value,
                 if selected {
                     Style::default().fg(FG)
                 } else {
@@ -1157,7 +1165,7 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
     let help = if app.env_editing_var {
         "type key/value  Tab:switch field  Enter:save  Esc:cancel"
     } else if app.env_editor_open {
-        "j/k:navigate  Enter/a:edit  d:delete  Esc:back"
+        "j/k:navigate  Enter/a:edit  d:delete  s:secret  Esc:back"
     } else if app.env_renaming {
         "type name  Enter:confirm  Esc:cancel"
     } else if app.env_import_open {
