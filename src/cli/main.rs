@@ -131,6 +131,13 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
     if app.view == View::Settings {
         return handle_settings_key(app, key.code);
     }
+    if app.header_editor.editing {
+        handle_kv_edit_key(&mut app.header_editor, key.code);
+        if !app.header_editor.editing {
+            app.sync_to_collection();
+        }
+        return false;
+    }
     if app.auth_editing {
         handle_auth_edit_key(app, key.code);
         return false;
@@ -331,6 +338,29 @@ fn handle_body_edit_key(app: &mut App, key: KeyCode) {
         KeyCode::End => app.body_cursor_end(),
         KeyCode::Tab => app.body_insert_tab(),
         KeyCode::Char(c) => app.body_insert(c),
+        _ => {}
+    }
+}
+
+fn handle_kv_edit_key(editor: &mut app::KvEditorState, key: KeyCode) {
+    match key {
+        KeyCode::Esc => editor.cancel_edit(),
+        KeyCode::Tab => editor.edit_field = 1 - editor.edit_field,
+        KeyCode::Enter => editor.confirm_edit(),
+        KeyCode::Backspace => {
+            if editor.edit_field == 0 {
+                editor.edit_key_buf.pop();
+            } else {
+                editor.edit_value_buf.pop();
+            }
+        }
+        KeyCode::Char(c) => {
+            if editor.edit_field == 0 {
+                editor.edit_key_buf.push(c);
+            } else {
+                editor.edit_value_buf.push(c);
+            }
+        }
         _ => {}
     }
 }
@@ -551,13 +581,25 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('E') => app.open_env_popup(),
             KeyCode::Char('1') => app.request_tab = RequestTab::Body,
             KeyCode::Char('2') => app.request_tab = RequestTab::Headers,
-            KeyCode::Char('3') => app.request_tab = RequestTab::Auth,
+            KeyCode::Char('3' | 'A') => app.request_tab = RequestTab::Auth,
             KeyCode::Char('4') => app.request_tab = RequestTab::Params,
-            KeyCode::Char('A') => {
-                app.request_tab = RequestTab::Auth;
+            KeyCode::Char('e' | 'i') => match app.request_tab {
+                RequestTab::Body => app.enter_body_edit(),
+                RequestTab::Headers => app.header_editor.start_edit(),
+                _ => {}
+            },
+            KeyCode::Char('a') if app.request_tab == RequestTab::Headers => {
+                app.header_editor.start_add();
             }
-            KeyCode::Char('e' | 'i') if app.request_tab == RequestTab::Body => {
-                app.enter_body_edit();
+            KeyCode::Char('d') if app.request_tab == RequestTab::Headers => {
+                app.header_editor.delete_selected();
+                app.sync_to_collection();
+            }
+            KeyCode::Char('j') | KeyCode::Down if app.request_tab == RequestTab::Headers => {
+                app.header_editor.move_down();
+            }
+            KeyCode::Char('k') | KeyCode::Up if app.request_tab == RequestTab::Headers => {
+                app.header_editor.move_up();
             }
             KeyCode::Enter => app.send_request(),
             KeyCode::Tab => app.focus = Focus::Response,

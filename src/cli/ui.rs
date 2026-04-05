@@ -270,7 +270,15 @@ fn draw_request_panel(frame: &mut Frame, app: &App, area: Rect) {
 
     match app.request_tab {
         RequestTab::Body => draw_body_content(frame, app, layout[1]),
-        RequestTab::Headers => draw_placeholder(frame, "Headers", layout[1]),
+        RequestTab::Headers => {
+            draw_kv_content(
+                frame,
+                app.focus == Focus::Body,
+                &app.header_editor,
+                "header",
+                layout[1],
+            );
+        }
         RequestTab::Auth => draw_placeholder(frame, "Auth", layout[1]),
         RequestTab::Params => draw_placeholder(frame, "Params", layout[1]),
     }
@@ -362,6 +370,126 @@ fn draw_body_content(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     let paragraph = Paragraph::new(content).block(block);
+    frame.render_widget(paragraph, area);
+}
+
+fn draw_kv_content(
+    frame: &mut Frame,
+    is_focused: bool,
+    editor: &crate::app::KvEditorState,
+    item_label: &str,
+    area: Rect,
+) {
+    let block = Block::default()
+        .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
+        .border_style(if is_focused {
+            Style::default().fg(GREEN)
+        } else {
+            Style::default().fg(MUTED)
+        })
+        .bg(BG);
+
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    if editor.editing {
+        draw_kv_edit_inline(frame, editor, inner);
+        return;
+    }
+
+    for (i, (key, value)) in editor.entries.iter().enumerate() {
+        let row_y = inner.y + i as u16;
+        if row_y >= inner.y + inner.height {
+            break;
+        }
+        let row = Rect::new(inner.x, row_y, inner.width, 1);
+        let selected = i == editor.selected;
+
+        if selected && is_focused {
+            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+        }
+
+        let line = Line::from(vec![
+            Span::styled(
+                if selected && is_focused { " > " } else { "   " },
+                Style::default().fg(GREEN),
+            ),
+            Span::styled(key, Style::default().fg(TEAL).bold()),
+            Span::styled(": ", Style::default().fg(MUTED)),
+            Span::styled(
+                value,
+                if selected && is_focused {
+                    Style::default().fg(FG)
+                } else {
+                    Style::default().fg(MUTED)
+                },
+            ),
+        ]);
+        frame.render_widget(Paragraph::new(line), row);
+    }
+
+    let add_y = inner.y + editor.entries.len() as u16;
+    if add_y < inner.y + inner.height {
+        let row = Rect::new(inner.x, add_y, inner.width, 1);
+        let selected = editor.selected >= editor.entries.len();
+
+        if selected && is_focused {
+            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+        }
+
+        let line = Line::from(Span::styled(
+            format!("   + add {item_label}"),
+            if selected && is_focused {
+                Style::default().fg(GREEN)
+            } else {
+                Style::default().fg(MUTED)
+            },
+        ));
+        frame.render_widget(Paragraph::new(line), row);
+    }
+}
+
+fn draw_kv_edit_inline(frame: &mut Frame, editor: &crate::app::KvEditorState, area: Rect) {
+    let key_style = if editor.edit_field == 0 {
+        Style::default().fg(GREEN)
+    } else {
+        Style::default().fg(FG)
+    };
+    let val_style = if editor.edit_field == 1 {
+        Style::default().fg(GREEN)
+    } else {
+        Style::default().fg(FG)
+    };
+
+    let key_display = if editor.edit_field == 0 {
+        format!("{}\u{2588}", &editor.edit_key_buf)
+    } else {
+        editor.edit_key_buf.clone()
+    };
+    let val_display = if editor.edit_field == 1 {
+        format!("{}\u{2588}", &editor.edit_value_buf)
+    } else {
+        editor.edit_value_buf.clone()
+    };
+
+    let lines = vec![
+        Line::default(),
+        Line::from(vec![
+            Span::styled("  Key:   ", Style::default().fg(MUTED)),
+            Span::styled(key_display, key_style),
+        ]),
+        Line::default(),
+        Line::from(vec![
+            Span::styled("  Value: ", Style::default().fg(MUTED)),
+            Span::styled(val_display, val_style),
+        ]),
+        Line::default(),
+        Line::from(Span::styled(
+            "  Tab:switch  Enter:save  Esc:cancel",
+            Style::default().fg(MUTED),
+        )),
+    ];
+    let paragraph = Paragraph::new(Text::from(lines));
     frame.render_widget(paragraph, area);
 }
 

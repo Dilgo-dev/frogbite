@@ -92,6 +92,83 @@ pub enum RequestTab {
     Params,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct KvEditorState {
+    pub entries: Vec<(String, String)>,
+    pub selected: usize,
+    pub editing: bool,
+    pub edit_field: usize,
+    pub edit_key_buf: String,
+    pub edit_value_buf: String,
+    pub editing_existing: bool,
+}
+
+impl KvEditorState {
+    pub fn count(&self) -> usize {
+        self.entries.len() + 1
+    }
+
+    pub fn move_down(&mut self) {
+        let max = self.count().saturating_sub(1);
+        if self.selected < max {
+            self.selected += 1;
+        }
+    }
+
+    pub const fn move_up(&mut self) {
+        self.selected = self.selected.saturating_sub(1);
+    }
+
+    pub fn start_add(&mut self) {
+        self.edit_key_buf.clear();
+        self.edit_value_buf.clear();
+        self.edit_field = 0;
+        self.editing_existing = false;
+        self.editing = true;
+    }
+
+    pub fn start_edit(&mut self) {
+        if self.selected >= self.entries.len() {
+            self.start_add();
+            return;
+        }
+        let (k, v) = &self.entries[self.selected];
+        self.edit_key_buf = k.clone();
+        self.edit_value_buf = v.clone();
+        self.edit_field = 0;
+        self.editing_existing = true;
+        self.editing = true;
+    }
+
+    pub fn confirm_edit(&mut self) {
+        if self.edit_key_buf.trim().is_empty() {
+            self.editing = false;
+            return;
+        }
+        if self.editing_existing && self.selected < self.entries.len() {
+            self.entries[self.selected] = (self.edit_key_buf.clone(), self.edit_value_buf.clone());
+        } else {
+            self.entries
+                .push((self.edit_key_buf.clone(), self.edit_value_buf.clone()));
+            self.selected = self.entries.len().saturating_sub(1);
+        }
+        self.editing = false;
+    }
+
+    pub const fn cancel_edit(&mut self) {
+        self.editing = false;
+    }
+
+    pub fn delete_selected(&mut self) {
+        if self.selected < self.entries.len() {
+            self.entries.remove(self.selected);
+            if self.selected > 0 && self.selected >= self.entries.len() {
+                self.selected = self.entries.len().saturating_sub(1);
+            }
+        }
+    }
+}
+
 #[allow(clippy::struct_excessive_bools)]
 pub struct App {
     pub method: Method,
@@ -148,6 +225,7 @@ pub struct App {
     pub env_import_open: bool,
     pub env_import_buffer: String,
     pub env_import_error: bool,
+    pub header_editor: KvEditorState,
     pub auth: Auth,
     pub auth_popup_open: bool,
     pub auth_popup_selected: usize,
@@ -231,6 +309,7 @@ impl App {
             env_import_open: false,
             env_import_buffer: String::new(),
             env_import_error: false,
+            header_editor: KvEditorState::default(),
             auth: Auth::None,
             auth_popup_open: false,
             auth_popup_selected: 0,
@@ -362,6 +441,8 @@ impl App {
             self.response = None;
             self.response_scroll = 0;
             self.active_request_id = Some(id.to_owned());
+            self.sync_headers_from_map();
+            self.request_tab = RequestTab::Body;
             self.save_collections();
         }
     }
@@ -375,6 +456,7 @@ impl App {
 
     /// Syncs current editor state back to the collection.
     pub fn sync_to_collection(&mut self) {
+        self.sync_headers_to_map();
         let Some(id) = self.active_request_id.clone() else {
             return;
         };
@@ -386,6 +468,27 @@ impl App {
             req.auth.clone_from(&self.auth);
         }
         self.save_collections();
+    }
+
+    fn sync_headers_from_map(&mut self) {
+        let mut entries: Vec<(String, String)> = self
+            .headers
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        self.header_editor.entries = entries;
+        self.header_editor.selected = 0;
+        self.header_editor.editing = false;
+    }
+
+    fn sync_headers_to_map(&mut self) {
+        self.headers = self
+            .header_editor
+            .entries
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
     }
 
     // -- Sidebar editing --
