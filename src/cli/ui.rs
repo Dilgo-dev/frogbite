@@ -280,7 +280,15 @@ fn draw_request_panel(frame: &mut Frame, app: &App, area: Rect) {
             );
         }
         RequestTab::Auth => draw_placeholder(frame, "Auth", layout[1]),
-        RequestTab::Params => draw_placeholder(frame, "Params", layout[1]),
+        RequestTab::Params => {
+            draw_kv_content(
+                frame,
+                app.focus == Focus::Body,
+                &app.param_editor,
+                "param",
+                layout[1],
+            );
+        }
     }
 }
 

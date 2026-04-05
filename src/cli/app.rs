@@ -226,6 +226,7 @@ pub struct App {
     pub env_import_buffer: String,
     pub env_import_error: bool,
     pub header_editor: KvEditorState,
+    pub param_editor: KvEditorState,
     pub auth: Auth,
     pub auth_popup_open: bool,
     pub auth_popup_selected: usize,
@@ -310,6 +311,7 @@ impl App {
             env_import_buffer: String::new(),
             env_import_error: false,
             header_editor: KvEditorState::default(),
+            param_editor: KvEditorState::default(),
             auth: Auth::None,
             auth_popup_open: false,
             auth_popup_selected: 0,
@@ -442,6 +444,7 @@ impl App {
             self.response_scroll = 0;
             self.active_request_id = Some(id.to_owned());
             self.sync_headers_from_map();
+            self.parse_params_from_url();
             self.request_tab = RequestTab::Body;
             self.save_collections();
         }
@@ -489,6 +492,45 @@ impl App {
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
+    }
+
+    pub fn parse_params_from_url(&mut self) {
+        self.param_editor.entries.clear();
+        let Some(query_start) = self.url.find('?') else {
+            self.param_editor.selected = 0;
+            return;
+        };
+        let query = &self.url[query_start + 1..];
+        let query = query.split('#').next().unwrap_or(query);
+        for pair in query.split('&') {
+            if pair.is_empty() {
+                continue;
+            }
+            let (key, value) = match pair.split_once('=') {
+                Some((k, v)) => (simple_url_decode(k), simple_url_decode(v)),
+                None => (simple_url_decode(pair), String::new()),
+            };
+            self.param_editor.entries.push((key, value));
+        }
+        self.param_editor.selected = 0;
+    }
+
+    pub fn sync_params_to_url(&mut self) {
+        let base = self.url.split('?').next().unwrap_or(&self.url).to_owned();
+        if self.param_editor.entries.is_empty() {
+            self.url = base;
+        } else {
+            let query: String = self
+                .param_editor
+                .entries
+                .iter()
+                .map(|(k, v)| format!("{}={}", simple_url_encode(k), simple_url_encode(v)))
+                .collect::<Vec<_>>()
+                .join("&");
+            self.url = format!("{base}?{query}");
+        }
+        self.cursor_pos = self.url.len();
+        self.sync_to_collection();
     }
 
     // -- Sidebar editing --
@@ -717,6 +759,7 @@ impl App {
 
     pub fn finish_url_edit(&mut self) {
         self.editing_url = false;
+        self.parse_params_from_url();
         self.sync_to_collection();
     }
 
@@ -1415,5 +1458,56 @@ fn default_collection() -> CollectionData {
             },
         ],
         active_request_id: None,
+    }
+}
+
+fn simple_url_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                out.push(b as char);
+            }
+            b' ' => out.push_str("%20"),
+            _ => {
+                out.push('%');
+                out.push(char::from(b"0123456789ABCDEF"[(b >> 4) as usize]));
+                out.push(char::from(b"0123456789ABCDEF"[(b & 0xF) as usize]));
+            }
+        }
+    }
+    out
+}
+
+fn simple_url_decode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let bytes = s.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hi = hex_val(bytes[i + 1]);
+            let lo = hex_val(bytes[i + 2]);
+            if let (Some(h), Some(l)) = (hi, lo) {
+                out.push((h << 4 | l) as char);
+                i += 3;
+                continue;
+            }
+        }
+        if bytes[i] == b'+' {
+            out.push(' ');
+        } else {
+            out.push(bytes[i] as char);
+        }
+        i += 1;
+    }
+    out
+}
+
+const fn hex_val(b: u8) -> Option<u8> {
+    match b {
+        b'0'..=b'9' => Some(b - b'0'),
+        b'A'..=b'F' => Some(b - b'A' + 10),
+        b'a'..=b'f' => Some(b - b'a' + 10),
+        _ => None,
     }
 }

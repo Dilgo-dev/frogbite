@@ -138,6 +138,13 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
         }
         return false;
     }
+    if app.param_editor.editing {
+        handle_kv_edit_key(&mut app.param_editor, key.code);
+        if !app.param_editor.editing {
+            app.sync_params_to_url();
+        }
+        return false;
+    }
     if app.auth_editing {
         handle_auth_edit_key(app, key.code);
         return false;
@@ -586,21 +593,35 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('e' | 'i') => match app.request_tab {
                 RequestTab::Body => app.enter_body_edit(),
                 RequestTab::Headers => app.header_editor.start_edit(),
-                _ => {}
+                RequestTab::Params => app.param_editor.start_edit(),
+                RequestTab::Auth => {}
             },
-            KeyCode::Char('a') if app.request_tab == RequestTab::Headers => {
-                app.header_editor.start_add();
-            }
-            KeyCode::Char('d') if app.request_tab == RequestTab::Headers => {
-                app.header_editor.delete_selected();
-                app.sync_to_collection();
-            }
-            KeyCode::Char('j') | KeyCode::Down if app.request_tab == RequestTab::Headers => {
-                app.header_editor.move_down();
-            }
-            KeyCode::Char('k') | KeyCode::Up if app.request_tab == RequestTab::Headers => {
-                app.header_editor.move_up();
-            }
+            KeyCode::Char('a') => match app.request_tab {
+                RequestTab::Headers => app.header_editor.start_add(),
+                RequestTab::Params => app.param_editor.start_add(),
+                RequestTab::Body | RequestTab::Auth => {}
+            },
+            KeyCode::Char('d') => match app.request_tab {
+                RequestTab::Headers => {
+                    app.header_editor.delete_selected();
+                    app.sync_to_collection();
+                }
+                RequestTab::Params => {
+                    app.param_editor.delete_selected();
+                    app.sync_params_to_url();
+                }
+                RequestTab::Body | RequestTab::Auth => {}
+            },
+            KeyCode::Char('j') | KeyCode::Down => match app.request_tab {
+                RequestTab::Headers => app.header_editor.move_down(),
+                RequestTab::Params => app.param_editor.move_down(),
+                RequestTab::Body | RequestTab::Auth => {}
+            },
+            KeyCode::Char('k') | KeyCode::Up => match app.request_tab {
+                RequestTab::Headers => app.header_editor.move_up(),
+                RequestTab::Params => app.param_editor.move_up(),
+                RequestTab::Body | RequestTab::Auth => {}
+            },
             KeyCode::Enter => app.send_request(),
             KeyCode::Tab => app.focus = Focus::Response,
             KeyCode::BackTab => app.focus = Focus::UrlBar,
