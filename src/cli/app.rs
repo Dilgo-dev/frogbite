@@ -228,8 +228,8 @@ pub struct App {
     pub header_editor: KvEditorState,
     pub param_editor: KvEditorState,
     pub auth: Auth,
-    pub auth_popup_open: bool,
-    pub auth_popup_selected: usize,
+    pub auth_selecting_type: bool,
+    pub auth_type_selected: usize,
     pub auth_editing: bool,
     pub auth_field: usize,
     pub auth_buf_a: String,
@@ -313,8 +313,8 @@ impl App {
             header_editor: KvEditorState::default(),
             param_editor: KvEditorState::default(),
             auth: Auth::None,
-            auth_popup_open: false,
-            auth_popup_selected: 0,
+            auth_selecting_type: false,
+            auth_type_selected: 0,
             auth_editing: false,
             auth_field: 0,
             auth_buf_a: String::new(),
@@ -989,8 +989,8 @@ impl App {
     }
 
     pub fn select_auth_type(&mut self) {
-        self.auth_popup_open = false;
-        let new_auth = match self.auth_popup_selected {
+        self.auth_selecting_type = false;
+        let new_auth = match self.auth_type_selected {
             1 => {
                 let token = if let Auth::Bearer { token } = &self.auth {
                     token.clone()

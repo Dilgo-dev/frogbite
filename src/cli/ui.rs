@@ -96,12 +96,6 @@ fn draw_main(frame: &mut Frame, app: &App) {
     if app.env_editor_open {
         draw_env_editor(frame, app);
     }
-    if app.auth_popup_open {
-        draw_auth_popup(frame, app);
-    }
-    if app.auth_editing {
-        draw_auth_edit(frame, app);
-    }
 }
 
 fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
@@ -240,13 +234,8 @@ fn draw_url_bar(frame: &mut Frame, app: &App, area: Rect) {
         ])
     };
 
-    let auth_label = match &app.auth {
-        Auth::None => " Request ".to_owned(),
-        _ => format!(" Request [{}] ", App::AUTH_TYPES[app.auth_type_index()]),
-    };
-
     let block = Block::default()
-        .title(auth_label)
+        .title(" Request ")
         .title_style(Style::default().fg(MUTED))
         .borders(Borders::ALL)
         .border_style(if is_focused {
@@ -279,7 +268,7 @@ fn draw_request_panel(frame: &mut Frame, app: &App, area: Rect) {
                 layout[1],
             );
         }
-        RequestTab::Auth => draw_placeholder(frame, "Auth", layout[1]),
+        RequestTab::Auth => draw_auth_content(frame, app, layout[1]),
         RequestTab::Params => {
             draw_kv_content(
                 frame,
@@ -498,24 +487,6 @@ fn draw_kv_edit_inline(frame: &mut Frame, editor: &crate::app::KvEditorState, ar
         )),
     ];
     let paragraph = Paragraph::new(Text::from(lines));
-    frame.render_widget(paragraph, area);
-}
-
-fn draw_placeholder(frame: &mut Frame, label: &str, area: Rect) {
-    let is_focused = false;
-    let block = Block::default()
-        .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
-        .border_style(if is_focused {
-            Style::default().fg(GREEN)
-        } else {
-            Style::default().fg(MUTED)
-        })
-        .bg(BG);
-
-    let msg = format!("{label} tab - not yet implemented");
-    let paragraph = Paragraph::new(Text::styled(msg, Style::default().fg(MUTED).italic()))
-        .block(block)
-        .alignment(Alignment::Center);
     frame.render_widget(paragraph, area);
 }
 
@@ -1330,37 +1301,71 @@ fn draw_env_var_edit(frame: &mut Frame, app: &App, parent: Rect) {
     frame.render_widget(paragraph, edit_inner);
 }
 
-fn draw_auth_popup(frame: &mut Frame, app: &App) {
-    let types = App::AUTH_TYPES;
-    let popup_h = types.len() as u16 + 2;
-    let popup_w: u16 = 20;
-
-    let area = frame.area();
-    let x = (area.width.saturating_sub(popup_w)) / 2;
-    let y = (area.height.saturating_sub(popup_h)) / 2;
-    let popup_area = Rect::new(x, y, popup_w, popup_h);
-
-    frame.render_widget(Clear, popup_area);
+fn draw_auth_content(frame: &mut Frame, app: &App, area: Rect) {
+    let is_focused = app.focus == Focus::Body;
 
     let block = Block::default()
-        .title(" Auth ")
-        .title_style(Style::default().fg(ORANGE).bold())
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(ORANGE))
+        .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
+        .border_style(if is_focused {
+            Style::default().fg(GREEN)
+        } else {
+            Style::default().fg(MUTED)
+        })
         .bg(BG);
 
-    let inner = block.inner(popup_area);
-    frame.render_widget(block, popup_area);
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
 
+    if app.auth_selecting_type {
+        draw_auth_type_selector(frame, app, inner);
+        return;
+    }
+
+    if app.auth_editing {
+        draw_auth_fields(frame, app, inner, true);
+        return;
+    }
+
+    let type_label = App::AUTH_TYPES[app.auth_type_index()];
+    let mut lines = vec![
+        Line::default(),
+        Line::from(vec![
+            Span::styled("  Type: ", Style::default().fg(MUTED)),
+            Span::styled(type_label, Style::default().fg(ORANGE).bold()),
+            Span::styled("  (t to change)", Style::default().fg(MUTED)),
+        ]),
+    ];
+
+    lines.push(Line::default());
+    if app.auth == Auth::None {
+        lines.push(Line::from(Span::styled(
+            "  No authentication configured",
+            Style::default().fg(MUTED).italic(),
+        )));
+    } else {
+        draw_auth_fields_static(app, &mut lines);
+        lines.push(Line::default());
+        lines.push(Line::from(Span::styled(
+            "  e:edit fields  t:change type",
+            Style::default().fg(MUTED),
+        )));
+    }
+
+    let paragraph = Paragraph::new(Text::from(lines));
+    frame.render_widget(paragraph, inner);
+}
+
+fn draw_auth_type_selector(frame: &mut Frame, app: &App, area: Rect) {
+    let types = App::AUTH_TYPES;
     let current = app.auth_type_index();
 
+    let mut y = area.y;
     for (i, label) in types.iter().enumerate() {
-        let row_y = inner.y + i as u16;
-        if row_y >= inner.y + inner.height {
+        if y >= area.y + area.height {
             break;
         }
-        let row = Rect::new(inner.x, row_y, inner.width, 1);
-        let selected = i == app.auth_popup_selected;
+        let row = Rect::new(area.x, y, area.width, 1);
+        let selected = i == app.auth_type_selected;
         let is_active = i == current;
 
         if selected {
@@ -1391,84 +1396,102 @@ fn draw_auth_popup(frame: &mut Frame, app: &App) {
             ),
         ]);
         frame.render_widget(Paragraph::new(line), row);
+        y += 1;
     }
 }
 
-fn draw_auth_edit(frame: &mut Frame, app: &App) {
-    let (title, label_a, label_b) = match &app.auth {
-        Auth::Bearer { .. } => ("Bearer Token", "Token:  ", ""),
-        Auth::Basic { .. } => ("Basic Auth", "User:   ", "Pass:   "),
-        Auth::ApiKey { .. } => ("API Key", "Header: ", "Value:  "),
+fn draw_auth_fields(frame: &mut Frame, app: &App, area: Rect, editing: bool) {
+    let (label_a, label_b) = match &app.auth {
+        Auth::Bearer { .. } => ("Token:    ", ""),
+        Auth::Basic { .. } => ("Username: ", "Password: "),
+        Auth::ApiKey { .. } => ("Header:   ", "Value:    "),
         Auth::None => return,
     };
-    let has_two = !label_b.is_empty();
 
-    let popup_h: u16 = if has_two { 8 } else { 5 };
-    let popup_w: u16 = 55;
-    let area = frame.area();
-    let x = (area.width.saturating_sub(popup_w)) / 2;
-    let y = (area.height.saturating_sub(popup_h)) / 2;
-    let popup_area = Rect::new(x, y, popup_w, popup_h);
+    let mut lines = vec![Line::default()];
 
-    frame.render_widget(Clear, popup_area);
-
-    let block = Block::default()
-        .title(format!(" {title} "))
-        .title_style(Style::default().fg(ORANGE).bold())
-        .borders(Borders::ALL)
-        .border_style(Style::default().fg(ORANGE))
-        .bg(BG);
-
-    let inner = block.inner(popup_area);
-    frame.render_widget(block, popup_area);
-
-    let style_a = if app.auth_field == 0 {
-        Style::default().fg(GREEN)
-    } else {
-        Style::default().fg(FG)
-    };
-    let buf_a = if app.auth_field == 0 {
-        format!("{}\u{2588}", &app.auth_buf_a)
-    } else {
-        app.auth_buf_a.clone()
-    };
-
-    let mut lines = vec![Line::from(vec![
-        Span::styled(format!("  {label_a}"), Style::default().fg(MUTED)),
-        Span::styled(buf_a, style_a),
-    ])];
-
-    if has_two {
-        let style_b = if app.auth_field == 1 {
+    if editing {
+        let style_a = if app.auth_field == 0 {
             Style::default().fg(GREEN)
         } else {
             Style::default().fg(FG)
         };
-        let buf_b = if app.auth_field == 1 {
-            format!("{}\u{2588}", &app.auth_buf_b)
+        let buf_a = if app.auth_field == 0 {
+            format!("{}\u{2588}", &app.auth_buf_a)
         } else {
-            app.auth_buf_b.clone()
+            app.auth_buf_a.clone()
         };
-        lines.push(Line::default());
         lines.push(Line::from(vec![
-            Span::styled(format!("  {label_b}"), Style::default().fg(MUTED)),
-            Span::styled(buf_b, style_b),
+            Span::styled(format!("  {label_a}"), Style::default().fg(MUTED)),
+            Span::styled(buf_a, style_a),
         ]));
+
+        if !label_b.is_empty() {
+            let style_b = if app.auth_field == 1 {
+                Style::default().fg(GREEN)
+            } else {
+                Style::default().fg(FG)
+            };
+            let buf_b = if app.auth_field == 1 {
+                format!("{}\u{2588}", &app.auth_buf_b)
+            } else {
+                app.auth_buf_b.clone()
+            };
+            lines.push(Line::default());
+            lines.push(Line::from(vec![
+                Span::styled(format!("  {label_b}"), Style::default().fg(MUTED)),
+                Span::styled(buf_b, style_b),
+            ]));
+        }
+
         lines.push(Line::default());
         lines.push(Line::from(Span::styled(
-            "  Tab:switch  Enter:save  Esc:cancel",
-            Style::default().fg(MUTED),
-        )));
-    } else {
-        lines.push(Line::default());
-        lines.push(Line::from(Span::styled(
-            "  Enter:save  Esc:cancel",
+            if label_b.is_empty() {
+                "  Enter:save  Esc:cancel"
+            } else {
+                "  Tab:switch  Enter:save  Esc:cancel"
+            },
             Style::default().fg(MUTED),
         )));
     }
 
     let paragraph = Paragraph::new(Text::from(lines));
-    frame.render_widget(paragraph, inner);
+    frame.render_widget(paragraph, area);
+}
+
+fn draw_auth_fields_static<'a>(app: &'a App, lines: &mut Vec<Line<'a>>) {
+    match &app.auth {
+        Auth::Bearer { token } => {
+            lines.push(Line::from(vec![
+                Span::styled("  Token:    ", Style::default().fg(MUTED)),
+                Span::styled(token, Style::default().fg(FG)),
+            ]));
+        }
+        Auth::Basic { username, password } => {
+            lines.push(Line::from(vec![
+                Span::styled("  Username: ", Style::default().fg(MUTED)),
+                Span::styled(username, Style::default().fg(FG)),
+            ]));
+            lines.push(Line::from(vec![
+                Span::styled("  Password: ", Style::default().fg(MUTED)),
+                Span::styled(
+                    "\u{2022}".repeat(password.len().clamp(4, 20)),
+                    Style::default().fg(FG),
+                ),
+            ]));
+        }
+        Auth::ApiKey { header, value } => {
+            lines.push(Line::from(vec![
+                Span::styled("  Header:   ", Style::default().fg(MUTED)),
+                Span::styled(header, Style::default().fg(FG)),
+            ]));
+            lines.push(Line::from(vec![
+                Span::styled("  Value:    ", Style::default().fg(MUTED)),
+                Span::styled(value, Style::default().fg(FG)),
+            ]));
+        }
+        Auth::None => {}
+    }
 }
 
 fn draw_settings(frame: &mut Frame, app: &App) {
@@ -1527,8 +1550,10 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
 
     let help = if app.auth_editing {
         "type value  Tab:switch  Enter:save  Esc:cancel"
-    } else if app.auth_popup_open {
-        "j/k:navigate  Enter:select  Esc:close"
+    } else if app.auth_selecting_type {
+        "j/k:navigate  Enter:select  Esc:cancel"
+    } else if app.header_editor.editing || app.param_editor.editing {
+        "type key/value  Tab:switch  Enter:save  Esc:cancel"
     } else if app.env_editing_var {
         "type key/value  Tab:switch field  Enter:save  Esc:cancel"
     } else if app.env_editor_open {

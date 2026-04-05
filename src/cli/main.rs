@@ -149,8 +149,8 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
         handle_auth_edit_key(app, key.code);
         return false;
     }
-    if app.auth_popup_open {
-        handle_auth_popup_key(app, key.code);
+    if app.auth_selecting_type {
+        handle_auth_type_select_key(app, key.code);
         return false;
     }
     if app.env_editing_var {
@@ -372,16 +372,16 @@ fn handle_kv_edit_key(editor: &mut app::KvEditorState, key: KeyCode) {
     }
 }
 
-fn handle_auth_popup_key(app: &mut App, key: KeyCode) {
+fn handle_auth_type_select_key(app: &mut App, key: KeyCode) {
     match key {
-        KeyCode::Esc => app.auth_popup_open = false,
+        KeyCode::Esc => app.auth_selecting_type = false,
         KeyCode::Char('j') | KeyCode::Down => {
-            if app.auth_popup_selected < App::AUTH_TYPES.len() - 1 {
-                app.auth_popup_selected += 1;
+            if app.auth_type_selected < App::AUTH_TYPES.len() - 1 {
+                app.auth_type_selected += 1;
             }
         }
         KeyCode::Char('k') | KeyCode::Up => {
-            app.auth_popup_selected = app.auth_popup_selected.saturating_sub(1);
+            app.auth_type_selected = app.auth_type_selected.saturating_sub(1);
         }
         KeyCode::Enter => app.select_auth_type(),
         _ => {}
@@ -558,6 +558,67 @@ fn handle_sidebar_key(app: &mut App, key: KeyCode) -> bool {
     false
 }
 
+fn handle_request_panel_key(app: &mut App, key: KeyCode) -> bool {
+    match key {
+        KeyCode::Char('q') => return true,
+        KeyCode::Char('s') => app.view = View::Settings,
+        KeyCode::Char('h') => app.open_history(),
+        KeyCode::Char('E') => app.open_env_popup(),
+        KeyCode::Char('1') => app.request_tab = RequestTab::Body,
+        KeyCode::Char('2') => app.request_tab = RequestTab::Headers,
+        KeyCode::Char('3' | 'A') => app.request_tab = RequestTab::Auth,
+        KeyCode::Char('4') => app.request_tab = RequestTab::Params,
+        KeyCode::Char('e' | 'i') => match app.request_tab {
+            RequestTab::Body => app.enter_body_edit(),
+            RequestTab::Headers => app.header_editor.start_edit(),
+            RequestTab::Params => app.param_editor.start_edit(),
+            RequestTab::Auth => {
+                if app.auth == collections::Auth::None {
+                    app.auth_type_selected = app.auth_type_index();
+                    app.auth_selecting_type = true;
+                } else {
+                    app.open_auth_edit();
+                }
+            }
+        },
+        KeyCode::Char('t') if app.request_tab == RequestTab::Auth => {
+            app.auth_type_selected = app.auth_type_index();
+            app.auth_selecting_type = true;
+        }
+        KeyCode::Char('a') => match app.request_tab {
+            RequestTab::Headers => app.header_editor.start_add(),
+            RequestTab::Params => app.param_editor.start_add(),
+            RequestTab::Body | RequestTab::Auth => {}
+        },
+        KeyCode::Char('d') => match app.request_tab {
+            RequestTab::Headers => {
+                app.header_editor.delete_selected();
+                app.sync_to_collection();
+            }
+            RequestTab::Params => {
+                app.param_editor.delete_selected();
+                app.sync_params_to_url();
+            }
+            RequestTab::Body | RequestTab::Auth => {}
+        },
+        KeyCode::Char('j') | KeyCode::Down => match app.request_tab {
+            RequestTab::Headers => app.header_editor.move_down(),
+            RequestTab::Params => app.param_editor.move_down(),
+            RequestTab::Body | RequestTab::Auth => {}
+        },
+        KeyCode::Char('k') | KeyCode::Up => match app.request_tab {
+            RequestTab::Headers => app.header_editor.move_up(),
+            RequestTab::Params => app.param_editor.move_up(),
+            RequestTab::Body | RequestTab::Auth => {}
+        },
+        KeyCode::Enter => app.send_request(),
+        KeyCode::Tab => app.focus = Focus::Response,
+        KeyCode::BackTab => app.focus = Focus::UrlBar,
+        _ => {}
+    }
+    false
+}
+
 /// Returns `true` when the app should quit.
 fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
     match app.focus {
@@ -581,52 +642,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::BackTab => app.focus = Focus::Sidebar,
             _ => {}
         },
-        Focus::Body => match key {
-            KeyCode::Char('q') => return true,
-            KeyCode::Char('s') => app.view = View::Settings,
-            KeyCode::Char('h') => app.open_history(),
-            KeyCode::Char('E') => app.open_env_popup(),
-            KeyCode::Char('1') => app.request_tab = RequestTab::Body,
-            KeyCode::Char('2') => app.request_tab = RequestTab::Headers,
-            KeyCode::Char('3' | 'A') => app.request_tab = RequestTab::Auth,
-            KeyCode::Char('4') => app.request_tab = RequestTab::Params,
-            KeyCode::Char('e' | 'i') => match app.request_tab {
-                RequestTab::Body => app.enter_body_edit(),
-                RequestTab::Headers => app.header_editor.start_edit(),
-                RequestTab::Params => app.param_editor.start_edit(),
-                RequestTab::Auth => {}
-            },
-            KeyCode::Char('a') => match app.request_tab {
-                RequestTab::Headers => app.header_editor.start_add(),
-                RequestTab::Params => app.param_editor.start_add(),
-                RequestTab::Body | RequestTab::Auth => {}
-            },
-            KeyCode::Char('d') => match app.request_tab {
-                RequestTab::Headers => {
-                    app.header_editor.delete_selected();
-                    app.sync_to_collection();
-                }
-                RequestTab::Params => {
-                    app.param_editor.delete_selected();
-                    app.sync_params_to_url();
-                }
-                RequestTab::Body | RequestTab::Auth => {}
-            },
-            KeyCode::Char('j') | KeyCode::Down => match app.request_tab {
-                RequestTab::Headers => app.header_editor.move_down(),
-                RequestTab::Params => app.param_editor.move_down(),
-                RequestTab::Body | RequestTab::Auth => {}
-            },
-            KeyCode::Char('k') | KeyCode::Up => match app.request_tab {
-                RequestTab::Headers => app.header_editor.move_up(),
-                RequestTab::Params => app.param_editor.move_up(),
-                RequestTab::Body | RequestTab::Auth => {}
-            },
-            KeyCode::Enter => app.send_request(),
-            KeyCode::Tab => app.focus = Focus::Response,
-            KeyCode::BackTab => app.focus = Focus::UrlBar,
-            _ => {}
-        },
+        Focus::Body => return handle_request_panel_key(app, key),
         Focus::Response => match key {
             KeyCode::Char('q') => return true,
             KeyCode::Char('s') => app.view = View::Settings,
