@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use frogbite::core::http::{HttpResponse, RequestOptions};
 
-use crate::collections::{self, Auth, CollectionData, Folder, SavedRequest};
+use crate::collections::{self, Auth, BodyType, CollectionData, Folder, SavedRequest};
 use crate::curl;
 use crate::environments::{self, Environment, Variable};
 use crate::history::{self, HistoryEntry};
@@ -225,6 +225,8 @@ pub struct App {
     pub env_import_open: bool,
     pub env_import_buffer: String,
     pub env_import_error: bool,
+    pub body_type: BodyType,
+    pub form_editor: KvEditorState,
     pub header_editor: KvEditorState,
     pub param_editor: KvEditorState,
     pub auth: Auth,
@@ -310,6 +312,8 @@ impl App {
             env_import_open: false,
             env_import_buffer: String::new(),
             env_import_error: false,
+            body_type: BodyType::Raw,
+            form_editor: KvEditorState::default(),
             header_editor: KvEditorState::default(),
             param_editor: KvEditorState::default(),
             auth: Auth::None,
@@ -351,7 +355,7 @@ impl App {
             if folder.expanded {
                 for req in &self.requests {
                     if req.folder_id.as_deref() == Some(&folder.id) {
-                        items.push(SidebarItem::Request(req.clone()));
+                        items.push(SidebarItem::Request(Box::new(req.clone())));
                     }
                 }
             }
@@ -359,7 +363,7 @@ impl App {
 
         for req in &self.requests {
             if req.folder_id.is_none() {
-                items.push(SidebarItem::Request(req.clone()));
+                items.push(SidebarItem::Request(Box::new(req.clone())));
             }
         }
 
@@ -437,6 +441,10 @@ impl App {
             self.body = req.body.clone();
             self.headers = req.headers.clone();
             self.auth = req.auth.clone();
+            self.body_type = req.body_type;
+            self.form_editor.entries = req.form_data.clone();
+            self.form_editor.selected = 0;
+            self.form_editor.editing = false;
             self.cursor_pos = self.url.len();
             self.body_row = 0;
             self.body_col = 0;
@@ -469,6 +477,8 @@ impl App {
             req.body.clone_from(&self.body);
             req.headers.clone_from(&self.headers);
             req.auth.clone_from(&self.auth);
+            req.body_type = self.body_type;
+            req.form_data.clone_from(&self.form_editor.entries);
         }
         self.save_collections();
     }
@@ -605,6 +615,8 @@ impl App {
             headers: HashMap::new(),
             folder_id,
             auth: Auth::None,
+            body_type: BodyType::Raw,
+            form_data: Vec::new(),
         };
 
         let id = req.id.clone();
@@ -647,6 +659,8 @@ impl App {
                 headers: req.headers.clone(),
                 folder_id: req.folder_id,
                 auth: req.auth,
+                body_type: req.body_type,
+                form_data: req.form_data,
             };
             let id = new_req.id.clone();
             self.requests.push(new_req);
@@ -907,6 +921,8 @@ impl App {
             headers: parsed.headers,
             folder_id,
             auth: Auth::None,
+            body_type: BodyType::Raw,
+            form_data: Vec::new(),
         };
 
         let id = req.id.clone();
@@ -1348,6 +1364,14 @@ impl App {
         result
     }
 
+    fn resolve_form_entries(&self) -> Vec<(String, String)> {
+        self.form_editor
+            .entries
+            .iter()
+            .map(|(k, v)| (self.resolve_variables(k), self.resolve_variables(v)))
+            .collect()
+    }
+
     // -- Request --
 
     pub fn send_request(&mut self) {
@@ -1364,15 +1388,37 @@ impl App {
             .collect();
         self.apply_auth_headers(&mut resolved_headers);
 
+        let body = match self.body_type {
+            BodyType::Raw => {
+                if resolved_body.is_empty() {
+                    None
+                } else {
+                    Some(frogbite::core::http::RequestBody::Raw(resolved_body))
+                }
+            }
+            BodyType::Form => {
+                let pairs = self.resolve_form_entries();
+                if pairs.is_empty() {
+                    None
+                } else {
+                    Some(frogbite::core::http::RequestBody::Form(pairs))
+                }
+            }
+            BodyType::Multipart => {
+                let pairs = self.resolve_form_entries();
+                if pairs.is_empty() {
+                    None
+                } else {
+                    Some(frogbite::core::http::RequestBody::Multipart(pairs))
+                }
+            }
+        };
+
         let opts = RequestOptions {
             method: self.method.as_str().to_owned(),
             url: resolved_url,
             headers: resolved_headers,
-            body: if resolved_body.is_empty() {
-                None
-            } else {
-                Some(resolved_body)
-            },
+            body,
         };
 
         let result = frogbite::core::http::send_request(&opts);
@@ -1408,7 +1454,7 @@ impl App {
 #[derive(Debug, Clone)]
 pub enum SidebarItem {
     Folder(Folder),
-    Request(SavedRequest),
+    Request(Box<SavedRequest>),
     NewRequest,
 }
 
@@ -1444,6 +1490,8 @@ fn default_collection() -> CollectionData {
                 headers: HashMap::new(),
                 folder_id: Some(folder_id.clone()),
                 auth: Auth::None,
+                body_type: BodyType::Raw,
+                form_data: Vec::new(),
             },
             SavedRequest {
                 id: collections::new_id(),
@@ -1455,6 +1503,8 @@ fn default_collection() -> CollectionData {
                 headers: HashMap::new(),
                 folder_id: Some(folder_id),
                 auth: Auth::None,
+                body_type: BodyType::Raw,
+                form_data: Vec::new(),
             },
         ],
         active_request_id: None,

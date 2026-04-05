@@ -3,13 +3,21 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
+/// Body payload for an outgoing HTTP request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum RequestBody {
+    Raw(String),
+    Form(Vec<(String, String)>),
+    Multipart(Vec<(String, String)>),
+}
+
 /// Configuration for an outgoing HTTP request.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequestOptions {
     pub method: String,
     pub url: String,
     pub headers: HashMap<String, String>,
-    pub body: Option<String>,
+    pub body: Option<RequestBody>,
 }
 
 /// Parsed HTTP response with status, headers, body and timing.
@@ -42,8 +50,21 @@ pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
         req = req.header(k.as_str(), v.as_str());
     }
 
-    if let Some(body) = &opts.body {
-        req = req.body(body.clone());
+    match &opts.body {
+        Some(RequestBody::Raw(text)) => {
+            req = req.body(text.clone());
+        }
+        Some(RequestBody::Form(pairs)) => {
+            req = req.form(pairs);
+        }
+        Some(RequestBody::Multipart(pairs)) => {
+            let mut form = reqwest::blocking::multipart::Form::new();
+            for (k, v) in pairs {
+                form = form.text(k.clone(), v.clone());
+            }
+            req = req.multipart(form);
+        }
+        None => {}
     }
 
     let resp: Response = req.send().map_err(|e| format!("Request failed: {e}"))?;

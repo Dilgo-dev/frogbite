@@ -23,6 +23,33 @@ pub enum Auth {
     },
 }
 
+/// Body content type for a request.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub enum BodyType {
+    #[default]
+    Raw,
+    Form,
+    Multipart,
+}
+
+impl BodyType {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Raw => "Raw",
+            Self::Form => "Form",
+            Self::Multipart => "Multipart",
+        }
+    }
+
+    pub const fn next(self) -> Self {
+        match self {
+            Self::Raw => Self::Form,
+            Self::Form => Self::Multipart,
+            Self::Multipart => Self::Raw,
+        }
+    }
+}
+
 /// A saved request in a collection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SavedRequest {
@@ -36,6 +63,10 @@ pub struct SavedRequest {
     pub folder_id: Option<String>,
     #[serde(default)]
     pub auth: Auth,
+    #[serde(default)]
+    pub body_type: BodyType,
+    #[serde(default)]
+    pub form_data: Vec<(String, String)>,
 }
 
 /// A folder grouping requests.

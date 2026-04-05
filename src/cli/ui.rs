@@ -324,7 +324,42 @@ fn draw_request_tab_bar(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_body_content(frame: &mut Frame, app: &App, area: Rect) {
+    use crate::collections::BodyType;
+
     let is_focused = app.focus == Focus::Body;
+
+    if app.body_type != BodyType::Raw {
+        let layout = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(1), Constraint::Min(1)])
+            .split(area);
+
+        let type_bar = Line::from(vec![
+            Span::styled("  Type: ", Style::default().fg(MUTED)),
+            Span::styled(app.body_type.label(), Style::default().fg(ORANGE).bold()),
+            Span::styled("  (b to change)", Style::default().fg(MUTED)),
+        ]);
+        frame.render_widget(
+            Paragraph::new(type_bar).bg(BG).block(
+                Block::default()
+                    .borders(Borders::LEFT | Borders::RIGHT)
+                    .border_style(if is_focused {
+                        Style::default().fg(GREEN)
+                    } else {
+                        Style::default().fg(MUTED)
+                    }),
+            ),
+            layout[0],
+        );
+
+        let label = if app.body_type == BodyType::Form {
+            "field"
+        } else {
+            "part"
+        };
+        draw_kv_content(frame, is_focused, &app.form_editor, label, layout[1]);
+        return;
+    }
 
     let block = Block::default()
         .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
@@ -335,11 +370,19 @@ fn draw_body_content(frame: &mut Frame, app: &App, area: Rect) {
         })
         .bg(BG);
 
-    let content = if app.body.is_empty() && !app.editing_body {
-        Text::styled("(empty body)", Style::default().fg(MUTED).italic())
+    let mut header_lines = vec![Line::from(vec![
+        Span::styled("  Type: ", Style::default().fg(MUTED)),
+        Span::styled("Raw", Style::default().fg(ORANGE).bold()),
+        Span::styled("  (b to change)", Style::default().fg(MUTED)),
+    ])];
+
+    if app.body.is_empty() && !app.editing_body {
+        header_lines.push(Line::from(Span::styled(
+            "(empty body)",
+            Style::default().fg(MUTED).italic(),
+        )));
     } else {
         let body_str = if app.body.is_empty() { "\n" } else { &app.body };
-        let mut lines = Vec::new();
         for (i, line) in body_str.split('\n').enumerate() {
             let num = Span::styled(format!("{:>3} ", i + 1), Style::default().fg(MUTED));
 
@@ -350,23 +393,22 @@ fn draw_body_content(frame: &mut Frame, app: &App, area: Rect) {
                 let after_start = col + cursor_ch.len_utf8().min(line.len() - col);
                 let after = &line[after_start..];
 
-                lines.push(Line::from(vec![
+                header_lines.push(Line::from(vec![
                     num,
                     Span::styled(before, Style::default().fg(FG)),
                     Span::styled(cursor_ch.to_string(), Style::default().fg(BG).bg(GREEN)),
                     Span::styled(after, Style::default().fg(FG)),
                 ]));
             } else {
-                lines.push(Line::from(vec![
+                header_lines.push(Line::from(vec![
                     num,
                     Span::styled(line, Style::default().fg(FG)),
                 ]));
             }
         }
-        Text::from(lines)
-    };
+    }
 
-    let paragraph = Paragraph::new(content).block(block);
+    let paragraph = Paragraph::new(Text::from(header_lines)).block(block);
     frame.render_widget(paragraph, area);
 }
 
@@ -1552,7 +1594,7 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
         "type value  Tab:switch  Enter:save  Esc:cancel"
     } else if app.auth_selecting_type {
         "j/k:navigate  Enter:select  Esc:cancel"
-    } else if app.header_editor.editing || app.param_editor.editing {
+    } else if app.form_editor.editing || app.header_editor.editing || app.param_editor.editing {
         "type key/value  Tab:switch  Enter:save  Esc:cancel"
     } else if app.env_editing_var {
         "type key/value  Tab:switch field  Enter:save  Esc:cancel"
@@ -1591,7 +1633,13 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
                     "e:edit  m:method  A:auth  Enter:send  h:history  E:env  s:settings"
                 }
                 Focus::Body => match app.request_tab {
-                    RequestTab::Body => "1-4:tabs  e:edit  Enter:send  q:quit",
+                    RequestTab::Body => {
+                        if app.body_type == crate::collections::BodyType::Raw {
+                            "1-4:tabs  b:type  e:edit  Enter:send  q:quit"
+                        } else {
+                            "1-4:tabs  b:type  j/k:nav  e:edit  a:add  d:del  Enter:send"
+                        }
+                    }
                     RequestTab::Headers | RequestTab::Params => {
                         "1-4:tabs  j/k:nav  e:edit  a:add  d:del  Enter:send"
                     }

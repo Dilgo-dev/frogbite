@@ -131,6 +131,13 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
     if app.view == View::Settings {
         return handle_settings_key(app, key.code);
     }
+    if app.form_editor.editing {
+        handle_kv_edit_key(&mut app.form_editor, key.code);
+        if !app.form_editor.editing {
+            app.sync_to_collection();
+        }
+        return false;
+    }
     if app.header_editor.editing {
         handle_kv_edit_key(&mut app.header_editor, key.code);
         if !app.header_editor.editing {
@@ -568,8 +575,15 @@ fn handle_request_panel_key(app: &mut App, key: KeyCode) -> bool {
         KeyCode::Char('2') => app.request_tab = RequestTab::Headers,
         KeyCode::Char('3' | 'A') => app.request_tab = RequestTab::Auth,
         KeyCode::Char('4') => app.request_tab = RequestTab::Params,
+        KeyCode::Char('b') if app.request_tab == RequestTab::Body => {
+            app.body_type = app.body_type.next();
+            app.sync_to_collection();
+        }
         KeyCode::Char('e' | 'i') => match app.request_tab {
-            RequestTab::Body => app.enter_body_edit(),
+            RequestTab::Body if app.body_type == collections::BodyType::Raw => {
+                app.enter_body_edit();
+            }
+            RequestTab::Body => app.form_editor.start_edit(),
             RequestTab::Headers => app.header_editor.start_edit(),
             RequestTab::Params => app.param_editor.start_edit(),
             RequestTab::Auth => {
@@ -586,11 +600,18 @@ fn handle_request_panel_key(app: &mut App, key: KeyCode) -> bool {
             app.auth_selecting_type = true;
         }
         KeyCode::Char('a') => match app.request_tab {
+            RequestTab::Body if app.body_type != collections::BodyType::Raw => {
+                app.form_editor.start_add();
+            }
             RequestTab::Headers => app.header_editor.start_add(),
             RequestTab::Params => app.param_editor.start_add(),
             RequestTab::Body | RequestTab::Auth => {}
         },
         KeyCode::Char('d') => match app.request_tab {
+            RequestTab::Body if app.body_type != collections::BodyType::Raw => {
+                app.form_editor.delete_selected();
+                app.sync_to_collection();
+            }
             RequestTab::Headers => {
                 app.header_editor.delete_selected();
                 app.sync_to_collection();
@@ -602,11 +623,17 @@ fn handle_request_panel_key(app: &mut App, key: KeyCode) -> bool {
             RequestTab::Body | RequestTab::Auth => {}
         },
         KeyCode::Char('j') | KeyCode::Down => match app.request_tab {
+            RequestTab::Body if app.body_type != collections::BodyType::Raw => {
+                app.form_editor.move_down();
+            }
             RequestTab::Headers => app.header_editor.move_down(),
             RequestTab::Params => app.param_editor.move_down(),
             RequestTab::Body | RequestTab::Auth => {}
         },
         KeyCode::Char('k') | KeyCode::Up => match app.request_tab {
+            RequestTab::Body if app.body_type != collections::BodyType::Raw => {
+                app.form_editor.move_up();
+            }
             RequestTab::Headers => app.header_editor.move_up(),
             RequestTab::Params => app.param_editor.move_up(),
             RequestTab::Body | RequestTab::Auth => {}

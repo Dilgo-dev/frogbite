@@ -125,6 +125,8 @@ fn process_item(
             headers,
             folder_id,
             auth: collections::Auth::None,
+            body_type: collections::BodyType::Raw,
+            form_data: Vec::new(),
         });
     }
 }
