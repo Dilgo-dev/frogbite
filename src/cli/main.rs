@@ -17,7 +17,7 @@ use crossterm::{
 use ratatui::{prelude::*, widgets::Paragraph};
 
 #[allow(unused_imports)]
-use app::{App, Focus, Method, ResponseTab, View};
+use app::{App, Focus, Method, RequestTab, ResponseTab, View};
 
 fn main() -> io::Result<()> {
     let s = settings::load();
@@ -471,62 +471,69 @@ fn handle_env_import_key(app: &mut App, key: KeyCode) {
 }
 
 /// Returns `true` when the app should quit.
-fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
-    match app.focus {
-        Focus::Sidebar => {
-            if app.confirm_delete {
-                match key {
-                    KeyCode::Char('d') => app.request_delete(),
-                    _ => app.cancel_delete(),
-                }
-                return false;
-            }
-            match key {
-                KeyCode::Char('q') => {
-                    app.save_collections();
-                    return true;
-                }
-                KeyCode::Char('s') => app.view = View::Settings,
-                KeyCode::Char('h') => app.open_history(),
-                KeyCode::Char('E') => app.open_env_popup(),
-                KeyCode::Char('r') => app.start_editing_name(),
-                KeyCode::Char('m') => app.cycle_sidebar_method(),
-                KeyCode::Char('a') => app.create_request(),
-                KeyCode::Char('A') => app.create_folder(),
-                KeyCode::Char('d') => app.request_delete(),
-                KeyCode::Char('D') => app.duplicate_request(),
-                KeyCode::Char('i') => app.open_curl_import(),
-                KeyCode::Char('I') => app.open_postman_import(),
-                KeyCode::Char('c') => app.open_curl_export(),
-                KeyCode::Char('j') | KeyCode::Down => {
-                    let max = app.sidebar_len().saturating_sub(1);
-                    if app.sidebar_selected < max {
-                        app.sidebar_selected += 1;
-                    }
-                }
-                KeyCode::Char('k') | KeyCode::Up => {
-                    app.sidebar_selected = app.sidebar_selected.saturating_sub(1);
-                }
-                KeyCode::Enter => {
-                    let is_folder = matches!(
-                        app.selected_sidebar_item(),
-                        Some(app::SidebarItem::Folder(_))
-                    );
-                    app.load_selected();
-                    if !is_folder {
-                        app.focus = Focus::UrlBar;
-                    }
-                }
-                KeyCode::Tab => app.focus = Focus::UrlBar,
-                _ => {}
+fn handle_sidebar_key(app: &mut App, key: KeyCode) -> bool {
+    if app.confirm_delete {
+        match key {
+            KeyCode::Char('d') => app.request_delete(),
+            _ => app.cancel_delete(),
+        }
+        return false;
+    }
+    match key {
+        KeyCode::Char('q') => {
+            app.save_collections();
+            return true;
+        }
+        KeyCode::Char('s') => app.view = View::Settings,
+        KeyCode::Char('h') => app.open_history(),
+        KeyCode::Char('E') => app.open_env_popup(),
+        KeyCode::Char('r') => app.start_editing_name(),
+        KeyCode::Char('m') => app.cycle_sidebar_method(),
+        KeyCode::Char('a') => app.create_request(),
+        KeyCode::Char('A') => app.create_folder(),
+        KeyCode::Char('d') => app.request_delete(),
+        KeyCode::Char('D') => app.duplicate_request(),
+        KeyCode::Char('i') => app.open_curl_import(),
+        KeyCode::Char('I') => app.open_postman_import(),
+        KeyCode::Char('c') => app.open_curl_export(),
+        KeyCode::Char('j') | KeyCode::Down => {
+            let max = app.sidebar_len().saturating_sub(1);
+            if app.sidebar_selected < max {
+                app.sidebar_selected += 1;
             }
         }
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.sidebar_selected = app.sidebar_selected.saturating_sub(1);
+        }
+        KeyCode::Enter => {
+            let is_folder = matches!(
+                app.selected_sidebar_item(),
+                Some(app::SidebarItem::Folder(_))
+            );
+            app.load_selected();
+            if !is_folder {
+                app.focus = Focus::UrlBar;
+            }
+        }
+        KeyCode::Tab => app.focus = Focus::UrlBar,
+        _ => {}
+    }
+    false
+}
+
+/// Returns `true` when the app should quit.
+fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
+    match app.focus {
+        Focus::Sidebar => return handle_sidebar_key(app, key),
         Focus::UrlBar => match key {
             KeyCode::Char('q') => return true,
             KeyCode::Char('s') => app.view = View::Settings,
             KeyCode::Char('h') => app.open_history(),
             KeyCode::Char('E') => app.open_env_popup(),
-            KeyCode::Char('A') => app.open_auth_popup(),
+            KeyCode::Char('A') => {
+                app.request_tab = RequestTab::Auth;
+                app.focus = Focus::Body;
+            }
             KeyCode::Char('e' | 'i') => {
                 app.editing_url = true;
                 app.cursor_pos = app.url.len();
@@ -542,8 +549,16 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('s') => app.view = View::Settings,
             KeyCode::Char('h') => app.open_history(),
             KeyCode::Char('E') => app.open_env_popup(),
-            KeyCode::Char('A') => app.open_auth_popup(),
-            KeyCode::Char('e' | 'i') => app.enter_body_edit(),
+            KeyCode::Char('1') => app.request_tab = RequestTab::Body,
+            KeyCode::Char('2') => app.request_tab = RequestTab::Headers,
+            KeyCode::Char('3') => app.request_tab = RequestTab::Auth,
+            KeyCode::Char('4') => app.request_tab = RequestTab::Params,
+            KeyCode::Char('A') => {
+                app.request_tab = RequestTab::Auth;
+            }
+            KeyCode::Char('e' | 'i') if app.request_tab == RequestTab::Body => {
+                app.enter_body_edit();
+            }
             KeyCode::Enter => app.send_request(),
             KeyCode::Tab => app.focus = Focus::Response,
             KeyCode::BackTab => app.focus = Focus::UrlBar,
@@ -554,7 +569,10 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('s') => app.view = View::Settings,
             KeyCode::Char('h') => app.open_history(),
             KeyCode::Char('E') => app.open_env_popup(),
-            KeyCode::Char('A') => app.open_auth_popup(),
+            KeyCode::Char('A') => {
+                app.request_tab = RequestTab::Auth;
+                app.focus = Focus::Body;
+            }
             KeyCode::Char('j') | KeyCode::Down => {
                 app.response_scroll = app.response_scroll.saturating_add(1);
             }

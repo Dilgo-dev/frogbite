@@ -84,6 +84,14 @@ pub enum ResponseTab {
     Headers,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RequestTab {
+    Body,
+    Headers,
+    Auth,
+    Params,
+}
+
 #[allow(clippy::struct_excessive_bools)]
 pub struct App {
     pub method: Method,
@@ -97,6 +105,7 @@ pub struct App {
     pub loading: bool,
     pub view: View,
     pub focus: Focus,
+    pub request_tab: RequestTab,
     pub response_tab: ResponseTab,
     pub response_scroll: u16,
     pub folders: Vec<Folder>,
@@ -179,6 +188,7 @@ impl App {
             loading: false,
             view: View::Main,
             focus: Focus::Sidebar,
+            request_tab: RequestTab::Body,
             response_tab: ResponseTab::Body,
             response_scroll: 0,
             folders,
@@ -830,11 +840,6 @@ impl App {
             Auth::Basic { .. } => 2,
             Auth::ApiKey { .. } => 3,
         }
-    }
-
-    pub const fn open_auth_popup(&mut self) {
-        self.auth_popup_selected = self.auth_type_index();
-        self.auth_popup_open = true;
     }
 
     pub fn select_auth_type(&mut self) {

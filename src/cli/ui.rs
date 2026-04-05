@@ -6,7 +6,7 @@ use ratatui::{
     },
 };
 
-use crate::app::{App, Focus, Method, ResponseTab, SidebarItem, View};
+use crate::app::{App, Focus, Method, RequestTab, ResponseTab, SidebarItem, View};
 use crate::collections::Auth;
 
 const GREEN: Color = Color::Rgb(124, 179, 66);
@@ -69,7 +69,7 @@ fn draw_main(frame: &mut Frame, app: &App) {
         .split(main_layout[1]);
 
     draw_url_bar(frame, app, content_layout[0]);
-    draw_body(frame, app, content_layout[1]);
+    draw_request_panel(frame, app, content_layout[1]);
     draw_response(frame, app, content_layout[2]);
 
     if app.method_popup {
@@ -260,13 +260,69 @@ fn draw_url_bar(frame: &mut Frame, app: &App, area: Rect) {
     frame.render_widget(paragraph, area);
 }
 
-fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
+fn draw_request_panel(frame: &mut Frame, app: &App, area: Rect) {
+    let layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(2), Constraint::Min(1)])
+        .split(area);
+
+    draw_request_tab_bar(frame, app, layout[0]);
+
+    match app.request_tab {
+        RequestTab::Body => draw_body_content(frame, app, layout[1]),
+        RequestTab::Headers => draw_placeholder(frame, "Headers", layout[1]),
+        RequestTab::Auth => draw_placeholder(frame, "Auth", layout[1]),
+        RequestTab::Params => draw_placeholder(frame, "Params", layout[1]),
+    }
+}
+
+fn draw_request_tab_bar(frame: &mut Frame, app: &App, area: Rect) {
+    let is_focused = app.focus == Focus::Body;
+    let tabs = [
+        ("Body", RequestTab::Body),
+        ("Headers", RequestTab::Headers),
+        ("Auth", RequestTab::Auth),
+        ("Params", RequestTab::Params),
+    ];
+
+    let mut spans = Vec::new();
+    spans.push(Span::raw("  "));
+    for (i, (label, tab)) in tabs.iter().enumerate() {
+        if i > 0 {
+            spans.push(Span::raw("  "));
+        }
+        let is_active = app.request_tab == *tab;
+        spans.push(Span::styled(
+            format!(" {label} "),
+            if is_active {
+                Style::default().fg(GREEN).bold().underlined()
+            } else {
+                Style::default().fg(MUTED)
+            },
+        ));
+    }
+
+    let border_color = if is_focused {
+        Style::default().fg(GREEN)
+    } else {
+        Style::default().fg(MUTED)
+    };
+
+    frame.render_widget(
+        Paragraph::new(Line::from(spans)).bg(SURFACE).block(
+            Block::default()
+                .borders(Borders::LEFT | Borders::RIGHT | Borders::TOP)
+                .border_style(border_color),
+        ),
+        area,
+    );
+}
+
+fn draw_body_content(frame: &mut Frame, app: &App, area: Rect) {
     let is_focused = app.focus == Focus::Body;
 
     let block = Block::default()
-        .title(" Body ")
-        .title_style(Style::default().fg(MUTED))
-        .borders(Borders::ALL)
+        .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
         .border_style(if is_focused {
             Style::default().fg(GREEN)
         } else {
@@ -306,6 +362,24 @@ fn draw_body(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     let paragraph = Paragraph::new(content).block(block);
+    frame.render_widget(paragraph, area);
+}
+
+fn draw_placeholder(frame: &mut Frame, label: &str, area: Rect) {
+    let is_focused = false;
+    let block = Block::default()
+        .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
+        .border_style(if is_focused {
+            Style::default().fg(GREEN)
+        } else {
+            Style::default().fg(MUTED)
+        })
+        .bg(BG);
+
+    let msg = format!("{label} tab - not yet implemented");
+    let paragraph = Paragraph::new(Text::styled(msg, Style::default().fg(MUTED).italic()))
+        .block(block)
+        .alignment(Alignment::Center);
     frame.render_widget(paragraph, area);
 }
 
