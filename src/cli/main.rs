@@ -143,6 +143,10 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
         handle_env_rename_key(app, key.code);
         return false;
     }
+    if app.env_import_open {
+        handle_env_import_key(app, key.code);
+        return false;
+    }
     if app.env_popup_open {
         handle_env_popup_key(app, key.code);
         return false;
@@ -340,6 +344,7 @@ fn handle_env_popup_key(app: &mut App, key: KeyCode) {
         KeyCode::Char('d') => app.delete_env_from_popup(),
         KeyCode::Char('r') => app.start_env_rename(),
         KeyCode::Char('e') => app.open_env_editor(),
+        KeyCode::Char('i') => app.open_env_import(),
         _ => {}
     }
 }
@@ -395,6 +400,22 @@ fn handle_env_var_edit_key(app: &mut App, key: KeyCode) {
             } else {
                 app.env_var_value_buffer.push(c);
             }
+        }
+        _ => {}
+    }
+}
+
+fn handle_env_import_key(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Esc => app.env_import_open = false,
+        KeyCode::Enter => app.confirm_env_import(),
+        KeyCode::Backspace => {
+            app.env_import_buffer.pop();
+            app.env_import_error = false;
+        }
+        KeyCode::Char(c) => {
+            app.env_import_buffer.push(c);
+            app.env_import_error = false;
         }
         _ => {}
     }

@@ -89,6 +89,9 @@ fn draw_main(frame: &mut Frame, app: &App) {
     if app.env_popup_open || app.env_renaming {
         draw_env_popup(frame, app);
     }
+    if app.env_import_open {
+        draw_env_import_popup(frame, app);
+    }
     if app.env_editor_open {
         draw_env_editor(frame, app);
     }
@@ -906,6 +909,54 @@ fn draw_env_popup(frame: &mut Frame, app: &App) {
     }
 }
 
+fn draw_env_import_popup(frame: &mut Frame, app: &App) {
+    let area = frame.area();
+    let popup_w = area.width.saturating_sub(10).min(70);
+    let popup_h: u16 = 5;
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let title = if app.env_import_error {
+        " Import .env (invalid) "
+    } else {
+        " Import .env "
+    };
+    let title_style = if app.env_import_error {
+        Style::default().fg(RED).bold()
+    } else {
+        Style::default().fg(TEAL).bold()
+    };
+
+    let block = Block::default()
+        .title(title)
+        .title_style(title_style)
+        .borders(Borders::ALL)
+        .border_style(if app.env_import_error {
+            Style::default().fg(RED)
+        } else {
+            Style::default().fg(TEAL)
+        })
+        .bg(BG);
+
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    let display = format!("{}\u{2588}", &app.env_import_buffer);
+    let lines = vec![
+        Line::from(Span::styled(
+            "Path to .env file:",
+            Style::default().fg(MUTED),
+        )),
+        Line::default(),
+        Line::from(Span::styled(display, Style::default().fg(FG))),
+    ];
+    let paragraph = Paragraph::new(Text::from(lines));
+    frame.render_widget(paragraph, inner);
+}
+
 fn draw_env_editor(frame: &mut Frame, app: &App) {
     let env = app.environments.iter().find(|e| e.id == app.env_editor_id);
     let env_name = env.map_or("?", |e| &e.name);
@@ -1109,8 +1160,10 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
         "j/k:navigate  Enter/a:edit  d:delete  Esc:back"
     } else if app.env_renaming {
         "type name  Enter:confirm  Esc:cancel"
+    } else if app.env_import_open {
+        "type path  Enter:import  Esc:cancel"
     } else if app.env_popup_open {
-        "j/k:nav  Enter:select  a:new  d:del  r:rename  e:edit vars  Esc:close"
+        "j/k:nav  Enter:select  a:new  d:del  r:rename  e:vars  i:.env  Esc:close"
     } else if app.postman_import_open {
         "type path  Enter:import  Esc:cancel"
     } else if app.curl_export_open {

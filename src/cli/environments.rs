@@ -47,3 +47,41 @@ pub fn save(data: &EnvironmentData) {
         let _ = fs::write(env_path(), json);
     }
 }
+
+/// Parses a .env file into a list of variables.
+pub fn parse_dotenv(path: &std::path::Path) -> Option<Vec<Variable>> {
+    let content = fs::read_to_string(path).ok()?;
+    let mut vars = Vec::new();
+
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        let Some((key, raw_value)) = trimmed.split_once('=') else {
+            continue;
+        };
+        let key = key
+            .trim()
+            .strip_prefix("export ")
+            .unwrap_or_else(|| key.trim());
+        if key.is_empty() {
+            continue;
+        }
+        let value = unquote(raw_value.trim());
+        vars.push(Variable {
+            key: key.to_owned(),
+            value,
+        });
+    }
+
+    Some(vars)
+}
+
+fn unquote(s: &str) -> String {
+    if (s.starts_with('"') && s.ends_with('"')) || (s.starts_with('\'') && s.ends_with('\'')) {
+        s[1..s.len() - 1].to_owned()
+    } else {
+        s.to_owned()
+    }
+}

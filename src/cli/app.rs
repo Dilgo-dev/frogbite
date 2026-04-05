@@ -136,6 +136,9 @@ pub struct App {
     pub env_var_field: usize,
     pub env_renaming: bool,
     pub env_name_buffer: String,
+    pub env_import_open: bool,
+    pub env_import_buffer: String,
+    pub env_import_error: bool,
 }
 
 impl App {
@@ -208,6 +211,9 @@ impl App {
             env_var_field: 0,
             env_renaming: false,
             env_name_buffer: String::new(),
+            env_import_open: false,
+            env_import_buffer: String::new(),
+            env_import_error: false,
         };
 
         if let Some(id) = &app.active_request_id.clone() {
@@ -907,6 +913,36 @@ impl App {
             }
         }
         self.env_renaming = false;
+    }
+
+    pub fn open_env_import(&mut self) {
+        self.env_import_buffer = String::new();
+        self.env_import_error = false;
+        self.env_import_open = true;
+    }
+
+    pub fn confirm_env_import(&mut self) {
+        let path = std::path::Path::new(self.env_import_buffer.trim());
+        let Some(vars) = environments::parse_dotenv(path) else {
+            self.env_import_error = true;
+            return;
+        };
+
+        let name = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("dotenv")
+            .to_owned();
+
+        let env = Environment {
+            id: collections::new_id(),
+            name,
+            variables: vars,
+        };
+        self.environments.push(env);
+        self.env_popup_selected = self.environments.len();
+        self.save_environments();
+        self.env_import_open = false;
     }
 
     pub fn open_env_editor(&mut self) {
