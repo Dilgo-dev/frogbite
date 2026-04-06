@@ -51,6 +51,16 @@ pub struct HttpResponse {
 }
 
 /// Sends a blocking HTTP request and returns the parsed response.
+fn error_chain(err: &dyn std::error::Error) -> String {
+    let mut parts = vec![err.to_string()];
+    let mut src = err.source();
+    while let Some(e) = src {
+        parts.push(e.to_string());
+        src = e.source();
+    }
+    parts.join(" -> ")
+}
+
 #[allow(clippy::too_many_lines)]
 pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
     let chain: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
@@ -146,10 +156,29 @@ pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
 
     let resp: Response = req.send().map_err(|e| {
         if e.is_timeout() {
-            format!("Request timed out after {timeout_secs}s")
-        } else {
-            format!("Request failed: {e}")
+            return format!("Request timed out after {timeout_secs}s");
         }
+        let chain = error_chain(&e);
+        if chain.contains("UnknownIssuer")
+            || chain.contains("self-signed")
+            || chain.contains("self signed")
+        {
+            return format!(
+                "TLS error: untrusted/self-signed certificate. \
+                 Disable 'Verify TLS' in the TLS popup (S) or add the CA cert. \
+                 ({chain})"
+            );
+        }
+        if chain.contains("CertificateExpired") || chain.contains("Expired") {
+            return format!("TLS error: certificate expired ({chain})");
+        }
+        if chain.contains("NotValidForName") || chain.contains("hostname") {
+            return format!("TLS error: certificate hostname mismatch ({chain})");
+        }
+        if chain.to_lowercase().contains("certificate") || chain.to_lowercase().contains("tls") {
+            return format!("TLS error: {chain}");
+        }
+        format!("Request failed: {chain}")
     })?;
     let duration_ms = start.elapsed().as_millis();
 
