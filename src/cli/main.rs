@@ -127,6 +127,7 @@ fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> 
 }
 
 /// Returns `true` when the app should quit.
+#[allow(clippy::too_many_lines)]
 fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
     app.clipboard_msg = None;
     if app.confirm_delete {
@@ -186,6 +187,10 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
     }
     if app.env_import_open {
         handle_env_import_key(app, key.code);
+        return false;
+    }
+    if app.timeout_popup_open {
+        handle_timeout_popup_key(app, key.code);
         return false;
     }
     if app.env_popup_open {
@@ -522,6 +527,22 @@ fn handle_env_var_edit_key(app: &mut App, key: KeyCode) {
     }
 }
 
+fn handle_timeout_popup_key(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Esc => app.timeout_popup_open = false,
+        KeyCode::Enter => app.confirm_timeout_popup(),
+        KeyCode::Backspace => {
+            app.timeout_buffer.pop();
+            app.timeout_error = false;
+        }
+        KeyCode::Char(c) if c.is_ascii_digit() => {
+            app.timeout_buffer.push(c);
+            app.timeout_error = false;
+        }
+        _ => {}
+    }
+}
+
 fn handle_env_import_key(app: &mut App, key: KeyCode) {
     match key {
         KeyCode::Esc => app.env_import_open = false,
@@ -689,6 +710,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             }
             KeyCode::Char('m') => app.open_method_popup(),
             KeyCode::Char('R') => app.toggle_follow_redirects(),
+            KeyCode::Char('T') => app.open_timeout_popup(),
             KeyCode::Enter => app.send_request(),
             KeyCode::Tab => app.focus = Focus::Body,
             KeyCode::BackTab => app.focus = Focus::Sidebar,

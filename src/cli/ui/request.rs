@@ -33,11 +33,17 @@ pub(super) fn draw_url_bar(frame: &mut Frame, app: &App, area: Rect) {
         ])
     };
 
-    let title = if app.follow_redirects {
-        " Request ".to_owned()
+    let redirects_part = if app.follow_redirects {
+        ""
     } else {
-        " Request  [redirects: off] ".to_owned()
+        "  [redirects: off]"
     };
+    let timeout_part = if app.timeout_secs == 30 {
+        String::new()
+    } else {
+        format!("  [timeout: {}s]", app.timeout_secs)
+    };
+    let title = format!(" Request{redirects_part}{timeout_part} ");
     let block = Block::default()
         .title(title)
         .title_style(Style::default().fg(MUTED))

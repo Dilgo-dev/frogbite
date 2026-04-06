@@ -93,6 +93,9 @@ fn draw_main(frame: &mut Frame, app: &App) {
     if app.env_import_open {
         modals::draw_env_import_popup(frame, app);
     }
+    if app.timeout_popup_open {
+        modals::draw_timeout_popup(frame, app);
+    }
     if app.env_editor_open {
         modals::draw_env_editor(frame, app);
     }
@@ -116,6 +119,8 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
         "j/k:navigate  Enter/a:edit  d:delete  s:secret  Esc:back"
     } else if app.env_renaming {
         "type name  Enter:confirm  Esc:cancel"
+    } else if app.timeout_popup_open {
+        "type seconds  Enter:save  Esc:cancel"
     } else if app.env_import_open {
         "type path  Enter:import  Esc:cancel"
     } else if app.env_popup_open {
@@ -144,7 +149,7 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
                     "j/k:nav  a:new  A:folder  d:del  D:dup  r:rename  i:curl  I:postman  q:quit"
                 }
                 Focus::UrlBar => {
-                    "e:edit  m:method  A:auth  R:redirects  Enter:send  h:history  E:env  s:settings"
+                    "e:edit  m:method  A:auth  R:redirects  T:timeout  Enter:send  h:history  E:env  s"
                 }
                 Focus::Body => match app.request_tab {
                     RequestTab::Body => {

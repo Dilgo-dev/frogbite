@@ -357,6 +357,48 @@ pub(super) fn draw_env_popup(frame: &mut Frame, app: &App) {
     }
 }
 
+pub(super) fn draw_timeout_popup(frame: &mut Frame, app: &App) {
+    let area = frame.area();
+    let popup_w = area.width.saturating_sub(10).min(50);
+    let popup_h: u16 = 6;
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let title = if app.timeout_error {
+        " Timeout (1-3600) "
+    } else {
+        " Request timeout "
+    };
+    let color = if app.timeout_error { RED } else { TEAL };
+
+    let block = Block::default()
+        .title(title)
+        .title_style(Style::default().fg(color).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(color))
+        .bg(BG);
+
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    let display = format!("{}\u{2588}", &app.timeout_buffer);
+    let lines = vec![
+        Line::from(Span::styled("Seconds:", Style::default().fg(MUTED))),
+        Line::default(),
+        Line::from(Span::styled(display, Style::default().fg(FG))),
+        Line::default(),
+        Line::from(Span::styled(
+            "Enter:save  Esc:cancel",
+            Style::default().fg(MUTED),
+        )),
+    ];
+    let paragraph = Paragraph::new(Text::from(lines));
+    frame.render_widget(paragraph, inner);
+}
+
 pub(super) fn draw_env_import_popup(frame: &mut Frame, app: &App) {
     let area = frame.area();
     let popup_w = area.width.saturating_sub(10).min(70);

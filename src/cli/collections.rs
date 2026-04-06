@@ -110,6 +110,12 @@ pub struct SavedRequest {
     pub form_data: Vec<(String, String)>,
     #[serde(default = "default_true")]
     pub follow_redirects: bool,
+    #[serde(default = "default_timeout")]
+    pub timeout_secs: u64,
+}
+
+pub const fn default_timeout() -> u64 {
+    30
 }
 
 const fn default_true() -> bool {

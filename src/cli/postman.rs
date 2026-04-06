@@ -129,6 +129,7 @@ fn process_item(
             content_type: collections::ContentType::Json,
             form_data: Vec::new(),
             follow_redirects: true,
+            timeout_secs: collections::default_timeout(),
         });
     }
 }

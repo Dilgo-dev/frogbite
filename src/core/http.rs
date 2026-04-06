@@ -22,6 +22,8 @@ pub struct RequestOptions {
     pub body: Option<RequestBody>,
     #[serde(default)]
     pub follow_redirects: bool,
+    #[serde(default)]
+    pub timeout_secs: u64,
 }
 
 /// Parsed HTTP response with status, headers, body and timing.
@@ -55,8 +57,13 @@ pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
         redirect::Policy::none()
     };
 
+    let timeout_secs = if opts.timeout_secs == 0 {
+        30
+    } else {
+        opts.timeout_secs
+    };
     let client = Client::builder()
-        .timeout(Duration::from_secs(30))
+        .timeout(Duration::from_secs(timeout_secs))
         .redirect(policy)
         .build()
         .map_err(|e| format!("Failed to create client: {e}"))?;

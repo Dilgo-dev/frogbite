@@ -172,9 +172,14 @@ pub struct App {
     pub response_match_idx: usize,
     pub clipboard_msg: Option<String>,
     pub follow_redirects: bool,
+    pub timeout_secs: u64,
+    pub timeout_popup_open: bool,
+    pub timeout_buffer: String,
+    pub timeout_error: bool,
 }
 
 impl App {
+    #[allow(clippy::too_many_lines)]
     pub fn new() -> Self {
         let settings = settings::load();
         let hist = history::load();
@@ -266,6 +271,10 @@ impl App {
             response_match_idx: 0,
             clipboard_msg: None,
             follow_redirects: true,
+            timeout_secs: collections::default_timeout(),
+            timeout_popup_open: false,
+            timeout_buffer: String::new(),
+            timeout_error: false,
         };
 
         if let Some(id) = &app.active_request_id.clone() {
@@ -388,6 +397,7 @@ impl App {
             self.content_type = req.content_type;
             self.form_editor.entries = req.form_data.clone();
             self.follow_redirects = req.follow_redirects;
+            self.timeout_secs = req.timeout_secs;
             self.form_editor.selected = 0;
             self.form_editor.editing = false;
             self.cursor_pos = self.url.len();
@@ -426,6 +436,7 @@ impl App {
             req.content_type = self.content_type;
             req.form_data.clone_from(&self.form_editor.entries);
             req.follow_redirects = self.follow_redirects;
+            req.timeout_secs = self.timeout_secs;
         }
         self.save_collections();
     }
@@ -575,6 +586,7 @@ impl App {
             content_type: ContentType::Json,
             form_data: Vec::new(),
             follow_redirects: true,
+            timeout_secs: collections::default_timeout(),
         };
 
         let id = req.id.clone();
@@ -621,6 +633,7 @@ impl App {
                 content_type: req.content_type,
                 form_data: req.form_data,
                 follow_redirects: req.follow_redirects,
+                timeout_secs: req.timeout_secs,
             };
             let id = new_req.id.clone();
             self.requests.push(new_req);
@@ -885,6 +898,7 @@ impl App {
             content_type: ContentType::Json,
             form_data: Vec::new(),
             follow_redirects: true,
+            timeout_secs: collections::default_timeout(),
         };
 
         let id = req.id.clone();
@@ -1397,6 +1411,23 @@ impl App {
 
     // -- Request --
 
+    pub fn open_timeout_popup(&mut self) {
+        self.timeout_buffer = self.timeout_secs.to_string();
+        self.timeout_error = false;
+        self.timeout_popup_open = true;
+    }
+
+    pub fn confirm_timeout_popup(&mut self) {
+        match self.timeout_buffer.trim().parse::<u64>() {
+            Ok(n) if n > 0 && n <= 3600 => {
+                self.timeout_secs = n;
+                self.timeout_popup_open = false;
+                self.sync_to_collection();
+            }
+            _ => self.timeout_error = true,
+        }
+    }
+
     pub fn toggle_follow_redirects(&mut self) {
         self.follow_redirects = !self.follow_redirects;
         self.sync_to_collection();
@@ -1461,6 +1492,7 @@ impl App {
             headers: resolved_headers,
             body,
             follow_redirects: self.follow_redirects,
+            timeout_secs: self.timeout_secs,
         };
 
         let result = frogbite::core::http::send_request(&opts);
@@ -1534,6 +1566,7 @@ fn default_collection() -> CollectionData {
                 content_type: ContentType::Json,
                 form_data: Vec::new(),
                 follow_redirects: true,
+                timeout_secs: collections::default_timeout(),
             },
             SavedRequest {
                 id: collections::new_id(),
@@ -1549,6 +1582,7 @@ fn default_collection() -> CollectionData {
                 content_type: ContentType::Json,
                 form_data: Vec::new(),
                 follow_redirects: true,
+                timeout_secs: collections::default_timeout(),
             },
         ],
         active_request_id: None,
