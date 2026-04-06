@@ -139,6 +139,10 @@ pub struct SavedRequest {
     pub proto_path: String,
     #[serde(default)]
     pub grpc_method: String,
+    #[serde(default)]
+    pub gql_variables: String,
+    #[serde(default)]
+    pub gql_operation_name: String,
 }
 
 pub const fn default_timeout() -> u64 {

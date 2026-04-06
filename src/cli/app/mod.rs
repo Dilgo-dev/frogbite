@@ -1,6 +1,7 @@
 mod auth_env;
 mod clipboard;
 mod editing;
+mod graphql;
 mod grpc;
 mod import;
 mod kv_editor;
@@ -10,6 +11,7 @@ mod url_utils;
 mod vars_search;
 mod ws;
 
+pub use graphql::GraphqlState;
 pub use grpc::GrpcState;
 pub use kv_editor::KvEditorState;
 pub use ws::{WsDirection, WsState, WsStatus};
@@ -48,6 +50,7 @@ pub enum Method {
     Head,
     Options,
     Grpc,
+    Graphql,
 }
 
 impl Method {
@@ -61,6 +64,7 @@ impl Method {
             Self::Head => "HEAD",
             Self::Options => "OPTIONS",
             Self::Grpc => "GRPC",
+            Self::Graphql => "GQL",
         }
     }
 
@@ -74,6 +78,7 @@ impl Method {
             Self::Head,
             Self::Options,
             Self::Grpc,
+            Self::Graphql,
         ]
     }
 
@@ -92,6 +97,7 @@ impl Method {
             "HEAD" => Self::Head,
             "OPTIONS" => Self::Options,
             "GRPC" => Self::Grpc,
+            "GQL" | "GRAPHQL" => Self::Graphql,
             _ => Self::Get,
         }
     }
@@ -340,6 +346,7 @@ pub struct App {
     pub assertions: AssertionsState,
     pub ws: WsState,
     pub grpc: GrpcState,
+    pub graphql: GraphqlState,
     pub ui: SettingsView,
     pub follow_redirects: bool,
     pub update_available: Option<String>,
@@ -521,6 +528,8 @@ fn default_collection() -> CollectionData {
                 last_assertion_results: Vec::new(),
                 proto_path: String::new(),
                 grpc_method: String::new(),
+                gql_variables: String::new(),
+                gql_operation_name: String::new(),
             },
             SavedRequest {
                 id: collections::new_id(),
@@ -549,6 +558,8 @@ fn default_collection() -> CollectionData {
                 last_assertion_results: Vec::new(),
                 proto_path: String::new(),
                 grpc_method: String::new(),
+                gql_variables: String::new(),
+                gql_operation_name: String::new(),
             },
         ],
         active_request_id: None,

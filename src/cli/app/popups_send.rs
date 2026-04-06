@@ -220,6 +220,7 @@ impl App {
         self.sync_to_collection();
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn send_request(&mut self) {
         if self.pending.is_some() {
             return;
@@ -234,7 +235,12 @@ impl App {
         self.sync_to_collection();
 
         let resolved_url = self.resolve_variables(&self.request.url);
-        let resolved_body = self.resolve_variables(&self.request.body);
+        let is_graphql = self.request.method == Method::Graphql;
+        let resolved_body = if is_graphql {
+            self.build_graphql_envelope()
+        } else {
+            self.resolve_variables(&self.request.body)
+        };
         let mut resolved_headers: HashMap<String, String> = self
             .request
             .headers
@@ -255,44 +261,57 @@ impl App {
         if !resolved_headers.contains_key("Content-Type")
             && !resolved_headers.contains_key("content-type")
         {
-            let ct = match self.request.body_type {
-                BodyType::Raw => Some(self.request.content_type.mime()),
-                BodyType::Form => Some("application/x-www-form-urlencoded"),
-                BodyType::Multipart => None,
+            let ct = if is_graphql {
+                Some("application/json")
+            } else {
+                match self.request.body_type {
+                    BodyType::Raw => Some(self.request.content_type.mime()),
+                    BodyType::Form => Some("application/x-www-form-urlencoded"),
+                    BodyType::Multipart => None,
+                }
             };
             if let Some(ct) = ct {
                 resolved_headers.insert("Content-Type".to_owned(), ct.to_owned());
             }
         }
 
-        let body = match self.request.body_type {
-            BodyType::Raw => {
-                if resolved_body.is_empty() {
-                    None
-                } else {
-                    Some(frogbite::core::http::RequestBody::Raw(resolved_body))
+        let body = if is_graphql {
+            Some(frogbite::core::http::RequestBody::Raw(resolved_body))
+        } else {
+            match self.request.body_type {
+                BodyType::Raw => {
+                    if resolved_body.is_empty() {
+                        None
+                    } else {
+                        Some(frogbite::core::http::RequestBody::Raw(resolved_body))
+                    }
                 }
-            }
-            BodyType::Form => {
-                let pairs = self.resolve_form_entries();
-                if pairs.is_empty() {
-                    None
-                } else {
-                    Some(frogbite::core::http::RequestBody::Form(pairs))
+                BodyType::Form => {
+                    let pairs = self.resolve_form_entries();
+                    if pairs.is_empty() {
+                        None
+                    } else {
+                        Some(frogbite::core::http::RequestBody::Form(pairs))
+                    }
                 }
-            }
-            BodyType::Multipart => {
-                let pairs = self.resolve_form_entries();
-                if pairs.is_empty() {
-                    None
-                } else {
-                    Some(frogbite::core::http::RequestBody::Multipart(pairs))
+                BodyType::Multipart => {
+                    let pairs = self.resolve_form_entries();
+                    if pairs.is_empty() {
+                        None
+                    } else {
+                        Some(frogbite::core::http::RequestBody::Multipart(pairs))
+                    }
                 }
             }
         };
 
+        let method_str = if is_graphql {
+            "POST".to_owned()
+        } else {
+            self.request.method.as_str().to_owned()
+        };
         let opts = RequestOptions {
-            method: self.request.method.as_str().to_owned(),
+            method: method_str,
             url: resolved_url,
             headers: resolved_headers,
             body,

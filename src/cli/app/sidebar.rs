@@ -387,6 +387,8 @@ impl App {
             last_assertion_results: Vec::new(),
             proto_path: String::new(),
             grpc_method: String::new(),
+            gql_variables: String::new(),
+            gql_operation_name: String::new(),
         };
 
         let id = req.id.clone();
@@ -446,6 +448,8 @@ impl App {
                 last_assertion_results: req.last_assertion_results,
                 proto_path: req.proto_path,
                 grpc_method: req.grpc_method,
+                gql_variables: req.gql_variables,
+                gql_operation_name: req.gql_operation_name,
             };
             let id = new_req.id.clone();
             self.sidebar.requests.push(new_req);

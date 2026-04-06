@@ -241,6 +241,10 @@ fn try_dispatch_modal(app: &mut App, key: &event::KeyEvent) -> bool {
         handle_proto_popup_key(app, key.code);
     } else if app.grpc.method_popup_open {
         handle_grpc_method_popup_key(app, key.code);
+    } else if app.graphql.vars_popup_open {
+        handle_gql_vars_popup_key(app, key);
+    } else if app.graphql.schema_popup_open {
+        handle_gql_schema_popup_key(app, key.code);
     } else {
         return false;
     }
@@ -412,6 +416,48 @@ fn handle_url_edit_key(app: &mut App, key: KeyCode) {
         KeyCode::Home => app.url_cursor_home(),
         KeyCode::End => app.url_cursor_end(),
         KeyCode::Char(c) => app.url_insert(c),
+        _ => {}
+    }
+}
+
+fn handle_gql_vars_popup_key(app: &mut App, key: &event::KeyEvent) {
+    match key.code {
+        KeyCode::Esc => {
+            app.graphql.vars_popup_open = false;
+            app.graphql.vars_error = None;
+        }
+        KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.confirm_gql_vars_popup();
+        }
+        KeyCode::Enter => {
+            app.graphql.vars_buffer.push('\n');
+            app.graphql.vars_error = None;
+        }
+        KeyCode::Backspace => {
+            app.graphql.vars_buffer.pop();
+            app.graphql.vars_error = None;
+        }
+        KeyCode::Char(c) => {
+            app.graphql.vars_buffer.push(c);
+            app.graphql.vars_error = None;
+        }
+        _ => {}
+    }
+}
+
+fn handle_gql_schema_popup_key(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Esc => app.graphql.schema_popup_open = false,
+        KeyCode::Char('j') | KeyCode::Down => {
+            let max = app.graphql.operations.len().saturating_sub(1);
+            if app.graphql.schema_popup_selected < max {
+                app.graphql.schema_popup_selected += 1;
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.graphql.schema_popup_selected = app.graphql.schema_popup_selected.saturating_sub(1);
+        }
+        KeyCode::Enter => app.confirm_gql_schema_popup(),
         _ => {}
     }
 }
@@ -906,6 +952,12 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('m') => app.open_method_popup(),
             KeyCode::Char('P') => app.open_proto_popup(),
             KeyCode::Char('G') => app.open_grpc_method_popup(),
+            KeyCode::Char('v') if app.request.method == app::Method::Graphql => {
+                app.open_gql_vars_popup();
+            }
+            KeyCode::Char('I') if app.request.method == app::Method::Graphql => {
+                app.run_introspection();
+            }
             KeyCode::Char('R') => app.toggle_follow_redirects(),
             KeyCode::Char('T') => app.open_timeout_popup(),
             KeyCode::Char('S') => app.open_tls_popup(),

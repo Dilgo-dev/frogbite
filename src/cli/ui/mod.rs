@@ -31,6 +31,7 @@ pub const fn method_color(method: &Method) -> Color {
         Method::Head => TEAL,
         Method::Options => MUTED,
         Method::Grpc => Color::Rgb(0, 188, 212),
+        Method::Graphql => Color::Rgb(225, 0, 152),
     }
 }
 
@@ -123,6 +124,12 @@ fn draw_main(frame: &mut Frame, app: &App) {
     if app.grpc.method_popup_open {
         modals::draw_grpc_method_popup(frame, app);
     }
+    if app.graphql.vars_popup_open {
+        modals::draw_gql_vars_popup(frame, app);
+    }
+    if app.graphql.schema_popup_open {
+        modals::draw_gql_schema_popup(frame, app);
+    }
 }
 
 #[allow(clippy::too_many_lines)]
@@ -183,6 +190,10 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
         "Esc:close"
     } else if app.curl_io.import_open {
         "paste cURL  Ctrl+S:import  Esc:cancel"
+    } else if app.graphql.vars_popup_open {
+        "type JSON  Enter:newline  Ctrl+S:save  Esc:cancel"
+    } else if app.graphql.schema_popup_open {
+        "j/k:navigate  Enter:insert template  Esc:cancel"
     } else if app.grpc.proto_popup_open {
         "type path  Enter:load  Esc:cancel"
     } else if app.grpc.method_popup_open || app.method_popup.open {

@@ -1098,6 +1098,114 @@ pub(super) fn draw_proto_popup(frame: &mut Frame, app: &App) {
     frame.render_widget(Paragraph::new(Text::from(lines)), inner);
 }
 
+pub(super) fn draw_gql_vars_popup(frame: &mut Frame, app: &App) {
+    let area = frame.area();
+    let popup_w = area.width.saturating_sub(10).min(80);
+    let popup_h = area.height.saturating_sub(6).min(20);
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .title(" GraphQL variables (JSON) ")
+        .title_style(Style::default().fg(GREEN).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GREEN))
+        .bg(BG);
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    let mut lines: Vec<Line> = app
+        .graphql
+        .vars_buffer
+        .lines()
+        .map(|l| Line::from(Span::styled(l.to_owned(), Style::default().fg(FG))))
+        .collect();
+    if app.graphql.vars_buffer.ends_with('\n') || app.graphql.vars_buffer.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "\u{2588}",
+            Style::default().fg(GREEN),
+        )));
+    } else if let Some(last) = lines.last_mut() {
+        last.spans
+            .push(Span::styled("\u{2588}", Style::default().fg(GREEN)));
+    }
+    if let Some(err) = &app.graphql.vars_error {
+        lines.push(Line::default());
+        lines.push(Line::from(Span::styled(
+            format!("! {err}"),
+            Style::default().fg(RED),
+        )));
+    }
+    frame.render_widget(Paragraph::new(Text::from(lines)), inner);
+}
+
+pub(super) fn draw_gql_schema_popup(frame: &mut Frame, app: &App) {
+    let area = frame.area();
+    let popup_w = area.width.saturating_sub(10).min(80);
+    let popup_h = (app.graphql.operations.len() as u16 + 4)
+        .min(area.height.saturating_sub(6))
+        .max(6);
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .title(" GraphQL schema ")
+        .title_style(Style::default().fg(GREEN).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GREEN))
+        .bg(BG);
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    if app.graphql.operations.is_empty() {
+        let msg = app
+            .graphql
+            .schema_error
+            .as_ref()
+            .map_or_else(|| "No operations".to_owned(), Clone::clone);
+        let p = Paragraph::new(Text::styled(msg, Style::default().fg(RED).italic()))
+            .alignment(Alignment::Center);
+        frame.render_widget(p, inner);
+        return;
+    }
+
+    for (i, op) in app.graphql.operations.iter().enumerate() {
+        let row_y = inner.y + i as u16;
+        if row_y >= inner.y + inner.height {
+            break;
+        }
+        let selected = i == app.graphql.schema_popup_selected;
+        let row = Rect::new(inner.x, row_y, inner.width, 1);
+        if selected {
+            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+        }
+        let kind_color = match op.kind.as_str() {
+            "Query" => GREEN,
+            "Mutation" => ORANGE,
+            "Subscription" => PURPLE,
+            _ => MUTED,
+        };
+        let line = Line::from(vec![
+            Span::styled(
+                if selected { " > " } else { "   " },
+                Style::default().fg(GREEN),
+            ),
+            Span::styled(
+                format!("{:<13}", op.kind),
+                Style::default().fg(kind_color).bold(),
+            ),
+            Span::styled(&op.name, Style::default().fg(FG)),
+        ]);
+        frame.render_widget(Paragraph::new(line), row);
+    }
+}
+
 pub(super) fn draw_grpc_method_popup(frame: &mut Frame, app: &App) {
     let area = frame.area();
     let popup_w = area.width.saturating_sub(10).min(80);
