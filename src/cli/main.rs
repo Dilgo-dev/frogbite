@@ -128,6 +128,13 @@ fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> 
 
 /// Returns `true` when the app should quit.
 fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
+    if app.confirm_delete {
+        match key.code {
+            KeyCode::Char('d') => app.request_delete(),
+            _ => app.cancel_delete(),
+        }
+        return false;
+    }
     if app.view == View::Settings {
         return handle_settings_key(app, key.code);
     }
@@ -532,13 +539,6 @@ fn handle_env_import_key(app: &mut App, key: KeyCode) {
 
 /// Returns `true` when the app should quit.
 fn handle_sidebar_key(app: &mut App, key: KeyCode) -> bool {
-    if app.confirm_delete {
-        match key {
-            KeyCode::Char('d') => app.request_delete(),
-            _ => app.cancel_delete(),
-        }
-        return false;
-    }
     match key {
         KeyCode::Char('q') => {
             app.save_collections();
