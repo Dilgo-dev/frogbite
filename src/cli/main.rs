@@ -130,7 +130,7 @@ fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> 
 fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
     if app.confirm_delete {
         match key.code {
-            KeyCode::Char('d') => app.request_delete(),
+            KeyCode::Char('y') => app.request_delete(),
             _ => app.cancel_delete(),
         }
         return false;

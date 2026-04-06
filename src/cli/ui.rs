@@ -103,7 +103,7 @@ fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
 
     let env_label = app.active_env_name().map(|n| format!(" frogbite [{n}] "));
     let title = if app.confirm_delete {
-        " Delete? (d=yes, Esc=no) ".to_owned()
+        " Delete? (y=yes, Esc=no) ".to_owned()
     } else {
         env_label.unwrap_or_else(|| " frogbite ".to_owned())
     };
@@ -1709,7 +1709,7 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
             View::Main if app.editing_body => {
                 "type body  arrows:move  Tab:indent  Enter:newline  Esc:stop"
             }
-            View::Main if app.confirm_delete => "d:confirm delete  any:cancel",
+            View::Main if app.confirm_delete => "y:confirm delete  any:cancel",
             View::Main => match app.focus {
                 Focus::Sidebar => {
                     "j/k:nav  a:new  d:del  D:dup  r:rename  i:curl  I:postman  E:env  q:quit"
