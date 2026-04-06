@@ -1,10 +1,9 @@
-use reqwest::blocking::{Client, Response};
+use reqwest::blocking::Client;
 use reqwest::tls::Version;
-use reqwest::{Certificate, Identity, redirect};
+use reqwest::{Certificate, Identity, Method, Url, redirect};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
-use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 /// Body payload for an outgoing HTTP request.
@@ -65,31 +64,16 @@ fn error_chain(err: &dyn std::error::Error) -> String {
 
 #[allow(clippy::too_many_lines)]
 pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
-    let chain: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
-
-    let policy = if opts.follow_redirects {
-        let chain_c = Arc::clone(&chain);
-        redirect::Policy::custom(move |attempt| {
-            if attempt.previous().len() >= 10 {
-                return attempt.error("too many redirects");
-            }
-            if let Ok(mut c) = chain_c.lock() {
-                c.push(attempt.url().to_string());
-            }
-            attempt.follow()
-        })
-    } else {
-        redirect::Policy::none()
-    };
-
     let timeout_secs = if opts.timeout_secs == 0 {
         30
     } else {
         opts.timeout_secs
     };
+    // We follow redirects manually so we can capture Set-Cookie headers and
+    // the URL chain at every hop.
     let mut builder = Client::builder()
         .timeout(Duration::from_secs(timeout_secs))
-        .redirect(policy);
+        .redirect(redirect::Policy::none());
 
     if !opts.verify_tls {
         builder = builder.danger_accept_invalid_certs(true);
@@ -128,89 +112,127 @@ pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
 
     let start = Instant::now();
 
-    let method = opts
+    let mut current_method = opts
         .method
-        .parse::<reqwest::Method>()
+        .parse::<Method>()
         .map_err(|e| format!("Invalid method: {e}"))?;
+    let mut current_url = opts.url.clone();
+    let mut current_body = opts.body.clone();
+    let mut redirect_chain: Vec<String> = Vec::new();
+    let mut set_cookies: Vec<String> = Vec::new();
+    let mut hops: u32 = 0;
 
-    let mut req = client.request(method, &opts.url);
-
-    for (k, v) in &opts.headers {
-        req = req.header(k.as_str(), v.as_str());
-    }
-
-    match &opts.body {
-        Some(RequestBody::Raw(text)) => {
-            req = req.body(text.clone());
+    let (final_status, final_status_text, headers, body) = loop {
+        let mut req = client.request(current_method.clone(), &current_url);
+        for (k, v) in &opts.headers {
+            req = req.header(k.as_str(), v.as_str());
         }
-        Some(RequestBody::Form(pairs)) => {
-            req = req.form(pairs);
-        }
-        Some(RequestBody::Multipart(pairs)) => {
-            let mut form = reqwest::blocking::multipart::Form::new();
-            for (k, v) in pairs {
-                form = form.text(k.clone(), v.clone());
+        match &current_body {
+            Some(RequestBody::Raw(text)) => {
+                req = req.body(text.clone());
             }
-            req = req.multipart(form);
+            Some(RequestBody::Form(pairs)) => {
+                req = req.form(pairs);
+            }
+            Some(RequestBody::Multipart(pairs)) => {
+                let mut form = reqwest::blocking::multipart::Form::new();
+                for (k, v) in pairs {
+                    form = form.text(k.clone(), v.clone());
+                }
+                req = req.multipart(form);
+            }
+            None => {}
         }
-        None => {}
-    }
 
-    let resp: Response = req.send().map_err(|e| {
-        if e.is_timeout() {
-            return format!("Request timed out after {timeout_secs}s");
+        let resp = req.send().map_err(|e| classify_error(&e, timeout_secs))?;
+        let status = resp.status().as_u16();
+        let status_text = resp.status().to_string();
+
+        let mut headers_map = HashMap::new();
+        for (k, v) in resp.headers() {
+            if let Ok(val) = v.to_str() {
+                if k.as_str().eq_ignore_ascii_case("set-cookie") {
+                    set_cookies.push(val.to_owned());
+                }
+                headers_map.insert(k.to_string(), val.to_owned());
+            }
         }
-        let chain = error_chain(&e);
-        if chain.contains("UnknownIssuer")
-            || chain.contains("self-signed")
-            || chain.contains("self signed")
-        {
-            return format!(
-                "TLS error: untrusted/self-signed certificate. \
-                 Disable 'Verify TLS' in the TLS popup (S) or add the CA cert. \
-                 ({chain})"
-            );
+        let location = headers_map
+            .iter()
+            .find(|(k, _)| k.eq_ignore_ascii_case("location"))
+            .map(|(_, v)| v.clone());
+
+        let is_redirect = (300..400).contains(&status) && status != 304;
+        if !opts.follow_redirects || !is_redirect {
+            let body_text = resp
+                .text()
+                .map_err(|e| format!("Failed to read body: {e}"))?;
+            break (status, status_text, headers_map, body_text);
         }
-        if chain.contains("CertificateExpired") || chain.contains("Expired") {
-            return format!("TLS error: certificate expired ({chain})");
+
+        let Some(loc) = location else {
+            let body_text = resp
+                .text()
+                .map_err(|e| format!("Failed to read body: {e}"))?;
+            break (status, status_text, headers_map, body_text);
+        };
+
+        // Drop the in-flight body so the next hop can be issued.
+        drop(resp);
+
+        hops += 1;
+        if hops > 10 {
+            return Err("Too many redirects (>10)".to_owned());
         }
-        if chain.contains("NotValidForName") || chain.contains("hostname") {
-            return format!("TLS error: certificate hostname mismatch ({chain})");
+
+        let base = Url::parse(&current_url).map_err(|e| format!("Invalid URL: {e}"))?;
+        let next = base
+            .join(&loc)
+            .map_err(|e| format!("Invalid redirect target: {e}"))?;
+        current_url = next.to_string();
+        redirect_chain.push(current_url.clone());
+
+        if matches!(status, 301..=303) && current_method != Method::HEAD {
+            current_method = Method::GET;
+            current_body = None;
         }
-        if chain.to_lowercase().contains("certificate") || chain.to_lowercase().contains("tls") {
-            return format!("TLS error: {chain}");
-        }
-        format!("Request failed: {chain}")
-    })?;
+    };
     let duration_ms = start.elapsed().as_millis();
 
-    let status = resp.status().as_u16();
-    let status_text = resp.status().to_string();
-
-    let mut headers = HashMap::new();
-    let mut set_cookies = Vec::new();
-    for (k, v) in resp.headers() {
-        if let Ok(val) = v.to_str() {
-            if k.as_str().eq_ignore_ascii_case("set-cookie") {
-                set_cookies.push(val.to_owned());
-            }
-            headers.insert(k.to_string(), val.to_owned());
-        }
-    }
-
-    let body = resp
-        .text()
-        .map_err(|e| format!("Failed to read body: {e}"))?;
-
-    let redirect_chain = chain.lock().map(|c| c.clone()).unwrap_or_default();
-
     Ok(HttpResponse {
-        status,
-        status_text,
+        status: final_status,
+        status_text: final_status_text,
         headers,
         body,
         duration_ms,
         redirect_chain,
         set_cookies,
     })
+}
+
+fn classify_error(e: &reqwest::Error, timeout_secs: u64) -> String {
+    if e.is_timeout() {
+        return format!("Request timed out after {timeout_secs}s");
+    }
+    let chain = error_chain(e);
+    if chain.contains("UnknownIssuer")
+        || chain.contains("self-signed")
+        || chain.contains("self signed")
+    {
+        return format!(
+            "TLS error: untrusted/self-signed certificate. \
+             Disable 'Verify TLS' in the TLS popup (S) or add the CA cert. \
+             ({chain})"
+        );
+    }
+    if chain.contains("CertificateExpired") || chain.contains("Expired") {
+        return format!("TLS error: certificate expired ({chain})");
+    }
+    if chain.contains("NotValidForName") || chain.contains("hostname") {
+        return format!("TLS error: certificate hostname mismatch ({chain})");
+    }
+    if chain.to_lowercase().contains("certificate") || chain.to_lowercase().contains("tls") {
+        return format!("TLS error: {chain}");
+    }
+    format!("Request failed: {chain}")
 }
