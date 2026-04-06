@@ -579,6 +579,13 @@ fn handle_request_panel_key(app: &mut App, key: KeyCode) -> bool {
             app.body_type = app.body_type.next();
             app.sync_to_collection();
         }
+        KeyCode::Char('c')
+            if app.request_tab == RequestTab::Body
+                && app.body_type == collections::BodyType::Raw =>
+        {
+            app.content_type = app.content_type.next();
+            app.sync_to_collection();
+        }
         KeyCode::Char('e' | 'i') => match app.request_tab {
             RequestTab::Body if app.body_type == collections::BodyType::Raw => {
                 app.enter_body_edit();

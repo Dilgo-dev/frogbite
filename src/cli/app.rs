@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use frogbite::core::http::{HttpResponse, RequestOptions};
 
-use crate::collections::{self, Auth, BodyType, CollectionData, Folder, SavedRequest};
+use crate::collections::{self, Auth, BodyType, CollectionData, ContentType, Folder, SavedRequest};
 use crate::curl;
 use crate::environments::{self, Environment, Variable};
 use crate::history::{self, HistoryEntry};
@@ -226,6 +226,7 @@ pub struct App {
     pub env_import_buffer: String,
     pub env_import_error: bool,
     pub body_type: BodyType,
+    pub content_type: ContentType,
     pub form_editor: KvEditorState,
     pub header_editor: KvEditorState,
     pub param_editor: KvEditorState,
@@ -313,6 +314,7 @@ impl App {
             env_import_buffer: String::new(),
             env_import_error: false,
             body_type: BodyType::Raw,
+            content_type: ContentType::Json,
             form_editor: KvEditorState::default(),
             header_editor: KvEditorState::default(),
             param_editor: KvEditorState::default(),
@@ -442,6 +444,7 @@ impl App {
             self.headers = req.headers.clone();
             self.auth = req.auth.clone();
             self.body_type = req.body_type;
+            self.content_type = req.content_type;
             self.form_editor.entries = req.form_data.clone();
             self.form_editor.selected = 0;
             self.form_editor.editing = false;
@@ -478,6 +481,7 @@ impl App {
             req.headers.clone_from(&self.headers);
             req.auth.clone_from(&self.auth);
             req.body_type = self.body_type;
+            req.content_type = self.content_type;
             req.form_data.clone_from(&self.form_editor.entries);
         }
         self.save_collections();
@@ -616,6 +620,7 @@ impl App {
             folder_id,
             auth: Auth::None,
             body_type: BodyType::Raw,
+            content_type: ContentType::Json,
             form_data: Vec::new(),
         };
 
@@ -660,6 +665,7 @@ impl App {
                 folder_id: req.folder_id,
                 auth: req.auth,
                 body_type: req.body_type,
+                content_type: req.content_type,
                 form_data: req.form_data,
             };
             let id = new_req.id.clone();
@@ -922,6 +928,7 @@ impl App {
             folder_id,
             auth: Auth::None,
             body_type: BodyType::Raw,
+            content_type: ContentType::Json,
             form_data: Vec::new(),
         };
 
@@ -1388,6 +1395,19 @@ impl App {
             .collect();
         self.apply_auth_headers(&mut resolved_headers);
 
+        if !resolved_headers.contains_key("Content-Type")
+            && !resolved_headers.contains_key("content-type")
+        {
+            let ct = match self.body_type {
+                BodyType::Raw => Some(self.content_type.mime()),
+                BodyType::Form => Some("application/x-www-form-urlencoded"),
+                BodyType::Multipart => None,
+            };
+            if let Some(ct) = ct {
+                resolved_headers.insert("Content-Type".to_owned(), ct.to_owned());
+            }
+        }
+
         let body = match self.body_type {
             BodyType::Raw => {
                 if resolved_body.is_empty() {
@@ -1491,6 +1511,7 @@ fn default_collection() -> CollectionData {
                 folder_id: Some(folder_id.clone()),
                 auth: Auth::None,
                 body_type: BodyType::Raw,
+                content_type: ContentType::Json,
                 form_data: Vec::new(),
             },
             SavedRequest {
@@ -1504,6 +1525,7 @@ fn default_collection() -> CollectionData {
                 folder_id: Some(folder_id),
                 auth: Auth::None,
                 body_type: BodyType::Raw,
+                content_type: ContentType::Json,
                 form_data: Vec::new(),
             },
         ],

@@ -50,6 +50,45 @@ impl BodyType {
     }
 }
 
+/// Content type for raw body mode.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub enum ContentType {
+    #[default]
+    Json,
+    Text,
+    Xml,
+    Html,
+}
+
+impl ContentType {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Json => "JSON",
+            Self::Text => "Text",
+            Self::Xml => "XML",
+            Self::Html => "HTML",
+        }
+    }
+
+    pub const fn mime(self) -> &'static str {
+        match self {
+            Self::Json => "application/json",
+            Self::Text => "text/plain",
+            Self::Xml => "application/xml",
+            Self::Html => "text/html",
+        }
+    }
+
+    pub const fn next(self) -> Self {
+        match self {
+            Self::Json => Self::Text,
+            Self::Text => Self::Xml,
+            Self::Xml => Self::Html,
+            Self::Html => Self::Json,
+        }
+    }
+}
+
 /// A saved request in a collection.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SavedRequest {
@@ -65,6 +104,8 @@ pub struct SavedRequest {
     pub auth: Auth,
     #[serde(default)]
     pub body_type: BodyType,
+    #[serde(default)]
+    pub content_type: ContentType,
     #[serde(default)]
     pub form_data: Vec<(String, String)>,
 }

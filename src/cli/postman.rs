@@ -126,6 +126,7 @@ fn process_item(
             folder_id,
             auth: collections::Auth::None,
             body_type: collections::BodyType::Raw,
+            content_type: collections::ContentType::Json,
             form_data: Vec::new(),
         });
     }

@@ -373,7 +373,9 @@ fn draw_body_content(frame: &mut Frame, app: &App, area: Rect) {
     let mut header_lines = vec![Line::from(vec![
         Span::styled("  Type: ", Style::default().fg(MUTED)),
         Span::styled("Raw", Style::default().fg(ORANGE).bold()),
-        Span::styled("  (b to change)", Style::default().fg(MUTED)),
+        Span::styled(" / ", Style::default().fg(MUTED)),
+        Span::styled(app.content_type.label(), Style::default().fg(TEAL).bold()),
+        Span::styled("  (b:type  c:format)", Style::default().fg(MUTED)),
     ])];
 
     if app.body.is_empty() && !app.editing_body {
@@ -1635,7 +1637,7 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
                 Focus::Body => match app.request_tab {
                     RequestTab::Body => {
                         if app.body_type == crate::collections::BodyType::Raw {
-                            "1-4:tabs  b:type  e:edit  Enter:send  q:quit"
+                            "1-4:tabs  b:type  c:format  e:edit  Enter:send  q:quit"
                         } else {
                             "1-4:tabs  b:type  j/k:nav  e:edit  a:add  d:del  Enter:send"
                         }
