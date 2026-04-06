@@ -25,7 +25,16 @@ use ratatui::{prelude::*, widgets::Paragraph};
 use app::{App, Focus, Method, RequestTab, ResponseTab, View};
 
 #[derive(Debug, Parser)]
-#[command(name = "frogbite", version, about = "Terminal API tester")]
+#[command(
+    name = "frogbite",
+    version,
+    about = "Terminal API tester - a fast, keyboard-driven TUI for HTTP APIs",
+    long_about = "frogbite is a terminal-based API tester built with Ratatui.\n\n\
+                  Run without arguments to launch the interactive TUI.\n\
+                  Use subcommands to send one-off requests, run saved collections \
+                  as test suites, or update frogbite to the latest release.\n\n\
+                  Config and data are stored in ~/.config/frogbite/."
+)]
 struct Cli {
     #[command(subcommand)]
     command: Option<run_cmd::Command>,
