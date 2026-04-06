@@ -98,7 +98,13 @@ pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
         None => {}
     }
 
-    let resp: Response = req.send().map_err(|e| format!("Request failed: {e}"))?;
+    let resp: Response = req.send().map_err(|e| {
+        if e.is_timeout() {
+            format!("Request timed out after {timeout_secs}s")
+        } else {
+            format!("Request failed: {e}")
+        }
+    })?;
     let duration_ms = start.elapsed().as_millis();
 
     let status = resp.status().as_u16();
