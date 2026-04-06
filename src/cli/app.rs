@@ -241,6 +241,7 @@ pub struct App {
     pub response_searching: bool,
     pub response_search_buf: String,
     pub response_match_idx: usize,
+    pub clipboard_msg: Option<String>,
 }
 
 impl App {
@@ -333,6 +334,7 @@ impl App {
             response_searching: false,
             response_search_buf: String::new(),
             response_match_idx: 0,
+            clipboard_msg: None,
         };
 
         if let Some(id) = &app.active_request_id.clone() {
@@ -1538,6 +1540,49 @@ impl App {
             None => String::new(),
         }
     }
+
+    pub fn copy_response_to_clipboard(&mut self) {
+        let text = self.formatted_response_body();
+        if text.is_empty() {
+            self.clipboard_msg = Some("Nothing to copy".to_owned());
+            return;
+        }
+        match copy_to_clipboard(&text) {
+            Ok(()) => self.clipboard_msg = Some("Copied to clipboard".to_owned()),
+            Err(e) => self.clipboard_msg = Some(e),
+        }
+    }
+}
+
+fn copy_to_clipboard(text: &str) -> Result<(), String> {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+
+    let commands: &[&[&str]] = &[
+        &["wl-copy"],
+        &["xclip", "-selection", "clipboard"],
+        &["xsel", "--clipboard", "--input"],
+    ];
+
+    for cmd in commands {
+        let Ok(mut child) = Command::new(cmd[0])
+            .args(&cmd[1..])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+        else {
+            continue;
+        };
+        if let Some(stdin) = child.stdin.as_mut() {
+            let _ = stdin.write_all(text.as_bytes());
+        }
+        if child.wait().is_ok() {
+            return Ok(());
+        }
+    }
+
+    Err("No clipboard tool found (wl-copy, xclip, xsel)".to_owned())
 }
 
 #[derive(Debug, Clone)]

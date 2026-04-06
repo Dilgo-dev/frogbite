@@ -128,6 +128,7 @@ fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> 
 
 /// Returns `true` when the app should quit.
 fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
+    app.clipboard_msg = None;
     if app.confirm_delete {
         match key.code {
             KeyCode::Char('y') => app.request_delete(),
@@ -713,6 +714,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('/') => app.open_search(),
             KeyCode::Char('n') => app.next_match(),
             KeyCode::Char('N') => app.prev_match(),
+            KeyCode::Char('y') => app.copy_response_to_clipboard(),
             KeyCode::Esc => app.clear_search(),
             KeyCode::Tab => app.focus = Focus::Sidebar,
             KeyCode::BackTab => app.focus = Focus::Body,

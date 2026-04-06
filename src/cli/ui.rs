@@ -596,7 +596,7 @@ fn draw_response_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     let status_line = match &app.response {
         Some(Ok(resp)) => {
             let color = status_color(resp.status);
-            Line::from(vec![
+            let mut spans = vec![
                 Span::styled(
                     format!(" {} ", resp.status_text),
                     Style::default().fg(BG).bg(color).bold(),
@@ -620,7 +620,12 @@ fn draw_response_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 } else {
                     Span::styled("Headers", Style::default().fg(MUTED))
                 },
-            ])
+            ];
+            if let Some(msg) = &app.clipboard_msg {
+                spans.push(Span::raw("    "));
+                spans.push(Span::styled(msg, Style::default().fg(GREEN).bold()));
+            }
+            Line::from(spans)
         }
         Some(Err(_)) => Line::from(vec![Span::styled(
             " ERROR ",
@@ -1730,7 +1735,7 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
                     }
                     RequestTab::Auth => "1-4:tabs  t:type  e:edit  Enter:send",
                 },
-                Focus::Response => "j/k:scroll  /:search  n/N:next/prev  1:body 2:headers",
+                Focus::Response => "j/k:scroll  /:search  n/N:match  y:copy  1:body 2:headers",
             },
         }
     };
