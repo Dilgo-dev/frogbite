@@ -1,6 +1,6 @@
 VERSION ?= dev
 
-.PHONY: build install clean fmt lint check app app-dev
+.PHONY: build install clean fmt lint check
 
 build:
 	cargo build --release
@@ -18,9 +18,3 @@ lint:
 	cargo clippy -- -D warnings
 
 check: fmt lint build
-
-app:
-	cd src/app && cargo tauri build
-
-app-dev:
-	cd src/app && cargo tauri dev

@@ -1,10 +1,34 @@
-[workspace]
-members = [".", "src/app"]
-
 [package]
 name = "frogbite"
 version = "0.1.0"
 edition = "2024"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+# Strictness
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+
+# Relax some pedantic lints that are too noisy
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+cast_possible_truncation = "allow"
+cast_sign_loss = "allow"
+cast_precision_loss = "allow"
+wildcard_imports = "allow"
+
+# Extra strict
+unwrap_used = "warn"
+expect_used = "warn"
+clone_on_ref_ptr = "warn"
+dbg_macro = "warn"
+todo = "warn"
+unimplemented = "warn"
+str_to_string = "warn"
 
 [[bin]]
 name = "frogbite"
@@ -13,7 +37,7 @@ path = "src/cli/main.rs"
 [dependencies]
 ratatui = "0.29"
 crossterm = "0.28"
-reqwest = { version = "0.12", features = ["blocking", "json"] }
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "json", "multipart", "rustls-tls"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
