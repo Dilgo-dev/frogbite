@@ -1,0 +1,34 @@
+name: Deploy install scripts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/install.sh'
+      - 'scripts/install.ps1'
+      - '.github/workflows/deploy-install-scripts.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-install-scripts
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_INSTALL_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "${{ secrets.VPS_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Upload install scripts via rsync
+        run: |
+          rsync -avz -e "ssh -i ~/.ssh/id_ed25519" \
+            scripts/install.sh scripts/install.ps1 \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}:
