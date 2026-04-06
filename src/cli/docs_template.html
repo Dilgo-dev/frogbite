@@ -295,6 +295,100 @@ main.content {
   text-transform: uppercase;
 }
 
+/* Send button + live response panel */
+
+.send-btn {
+  margin-left: auto;
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  padding: 7px 14px;
+  background: var(--primary);
+  color: var(--bg-deep);
+  border: 1px solid var(--primary);
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s, background .15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.send-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 0 var(--primary-deep); }
+.send-btn:active { transform: translateY(1px); box-shadow: none; }
+.send-btn.is-loading {
+  background: var(--surface);
+  color: var(--primary);
+  border-color: var(--primary-deep);
+  pointer-events: none;
+}
+.send-btn.is-loading .send-arrow { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.send-btn-disabled {
+  background: var(--surface);
+  color: var(--fg-dim);
+  border-color: var(--line-strong);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.live-panel {
+  margin: 0 0 24px;
+  border: 1px solid var(--primary-deep);
+  background: var(--bg-deep);
+  border-left: 3px solid var(--primary);
+}
+.live-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  border-bottom: 1px dashed var(--line-strong);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.live-status { color: var(--primary); font-weight: 700; }
+.live-status.is-error { color: var(--error); }
+.live-status.is-redirect { color: var(--info); }
+.live-status.is-warn { color: var(--warning); }
+.live-time { color: var(--fg-dim); }
+.live-close {
+  margin-left: auto;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+.live-close:hover { color: var(--primary); border-color: var(--primary-deep); }
+pre.live-body {
+  border: none;
+  border-top: none;
+  margin: 0;
+  max-height: 480px;
+  overflow: auto;
+}
+pre.live-body::before { content: "live"; color: var(--primary); }
+.live-body.is-error { color: var(--error); }
+.live-tip {
+  padding: 12px 16px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  border-top: 1px dashed var(--line-strong);
+}
+.live-tip code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  background: var(--surface);
+  padding: 1px 6px;
+  color: var(--primary);
+}
+
 .request-body { padding: 26px 26px 30px; }
 
 /* Numbered subsections (I. AUTH / II. HEADERS / ...) */
@@ -399,6 +493,14 @@ pre.code::before {
 .colophon a { color: var(--primary); text-decoration: none; border-bottom: 1px dashed var(--primary-deep); }
 .colophon a:hover { color: var(--fg); }
 .colophon-glyphs { color: var(--fg-muted); }
+.colophon .warn {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 8px;
+  border: 1px solid var(--error);
+  color: var(--error);
+  letter-spacing: 0.16em;
+}
 
 /* Mobile */
 
@@ -463,13 +565,119 @@ pre.code::before {
 
   <footer class="colophon">
     <div>
-      <span class="colophon-glyphs">⌐&nbsp;</span>
-      FROGBITE DOCS / GENERATED LOCALLY / NO TELEMETRY
+      <span class="colophon-glyphs">¬&nbsp;</span>
+      FROGBITE DOCS / GENERATED LOCALLY / NO TELEMETRY<br>
+      {SECRETS_WARNING}
     </div>
     <a href="https://github.com/Dilgo-dev/frogbite">github.com/Dilgo-dev/frogbite</a>
   </footer>
 </main>
 
 </div>
+
+<script id="frogbite-data" type="application/json">{PAYLOAD_JSON}</script>
+<script>
+(function () {
+  var data;
+  try {
+    data = JSON.parse(document.getElementById("frogbite-data").textContent);
+  } catch (e) { console.error("frogbite: payload parse failed", e); return; }
+
+  var index = {};
+  data.forEach(function (r) { index[r.id] = r; });
+
+  function statusClass(status) {
+    if (status === 0) return "is-error";
+    if (status >= 500) return "is-error";
+    if (status >= 400) return "is-warn";
+    if (status >= 300) return "is-redirect";
+    return "";
+  }
+
+  function pretty(text, contentType) {
+    if (!text) return "";
+    var ct = (contentType || "").toLowerCase();
+    if (ct.indexOf("json") !== -1 || /^[\s]*[\[{]/.test(text)) {
+      try { return JSON.stringify(JSON.parse(text), null, 2); } catch (e) {}
+    }
+    return text;
+  }
+
+  function human(bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  function send(id) {
+    var req = index[id];
+    if (!req) return;
+    var panel = document.getElementById("live-" + id);
+    var statusEl = panel.querySelector(".live-status");
+    var timeEl = panel.querySelector(".live-time");
+    var bodyEl = panel.querySelector(".live-body");
+    var btn = document.querySelector('.send-btn[data-fb-id="' + id + '"]');
+
+    panel.removeAttribute("hidden");
+    statusEl.className = "live-status";
+    statusEl.textContent = "SENDING";
+    timeEl.textContent = "";
+    bodyEl.className = "code live-body";
+    bodyEl.textContent = "";
+    if (btn) btn.classList.add("is-loading");
+
+    var started = performance.now();
+    var init = { method: req.method, headers: req.headers || {} };
+    if (req.body !== null && req.method !== "GET" && req.method !== "HEAD") {
+      init.body = req.body;
+    }
+
+    fetch(req.url, init)
+      .then(function (r) {
+        var ct = r.headers.get("content-type") || "";
+        return r.text().then(function (text) {
+          var elapsed = Math.round(performance.now() - started);
+          statusEl.className = "live-status " + statusClass(r.status);
+          statusEl.textContent = r.status + " " + r.statusText;
+          timeEl.textContent = elapsed + " ms / " + human(text.length);
+          bodyEl.textContent = pretty(text, ct);
+        });
+      })
+      .catch(function (err) {
+        var elapsed = Math.round(performance.now() - started);
+        statusEl.className = "live-status is-error";
+        statusEl.textContent = "NETWORK ERROR";
+        timeEl.textContent = elapsed + " ms";
+        var tip = "";
+        var msg = String(err && err.message || err);
+        if (/Failed to fetch|NetworkError|TypeError/.test(msg)) {
+          tip = "\n\nLikely CORS. The target server must respond with " +
+                "Access-Control-Allow-Origin matching this page's origin, or " +
+                "you can run the docs file through a permissive local server.";
+        }
+        bodyEl.className = "code live-body is-error";
+        bodyEl.textContent = msg + tip;
+      })
+      .finally(function () {
+        if (btn) btn.classList.remove("is-loading");
+      });
+  }
+
+  document.addEventListener("click", function (e) {
+    var sendBtn = e.target.closest(".send-btn");
+    if (sendBtn && !sendBtn.disabled) {
+      var id = sendBtn.getAttribute("data-fb-id");
+      if (id) { send(id); return; }
+    }
+    var closeBtn = e.target.closest(".live-close");
+    if (closeBtn) {
+      var cid = closeBtn.getAttribute("data-fb-close");
+      var p = document.getElementById("live-" + cid);
+      if (p) p.setAttribute("hidden", "");
+    }
+  });
+})();
+</script>
+
 </body>
 </html>

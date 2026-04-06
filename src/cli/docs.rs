@@ -13,6 +13,8 @@
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 
+use serde_json::{Value, json};
+
 use crate::collections::{Auth, BodyType, CollectionData, SavedRequest};
 
 const ASCII: &str = r"___________                   __________.__  __
@@ -32,6 +34,8 @@ pub fn render_html(data: &CollectionData, title_override: Option<&str>) -> Strin
 
     let mut nav = String::new();
     let mut sections = String::new();
+    let mut payloads: Vec<Value> = Vec::new();
+    let mut has_secrets = false;
 
     let mut groups: Vec<(String, Vec<&SavedRequest>)> = Vec::new();
     for folder in &data.folders {
@@ -90,6 +94,14 @@ pub fn render_html(data: &CollectionData, title_override: Option<&str>) -> Strin
                 name = name,
             );
 
+            // Build the runtime payload that the embedded JS will fetch.
+            let supported = !matches!(req.method.as_str(), "GRPC");
+            let payload = build_payload(req, &anchor, supported);
+            if has_real_secrets(&req.auth) {
+                has_secrets = true;
+            }
+            payloads.push(payload);
+
             let _ = write!(
                 sections,
                 "    <article class=\"request\" id=\"{anchor}\">\n      <div class=\"request-head\">\n        <span class=\"request-num\">{section_no}</span>\n        <span class=\"method m-{m}\">{m}</span>\n        <h3 class=\"request-name\">{name}</h3>\n        <code class=\"request-url\">{url}</code>\n",
@@ -108,7 +120,27 @@ pub fn render_html(data: &CollectionData, title_override: Option<&str>) -> Strin
                 );
             }
 
+            // Send button
+            if supported {
+                let _ = write!(
+                    sections,
+                    "        <button type=\"button\" class=\"send-btn\" data-fb-id=\"{anchor}\">SEND <span class=\"send-arrow\">&#8594;</span></button>\n",
+                    anchor = anchor,
+                );
+            } else {
+                sections.push_str(
+                    "        <button type=\"button\" class=\"send-btn send-btn-disabled\" disabled title=\"gRPC cannot be sent from a browser\">SEND <span class=\"send-arrow\">&#8594;</span></button>\n",
+                );
+            }
+
             sections.push_str("      </div>\n      <div class=\"request-body\">\n");
+
+            // Live response panel (filled by JS)
+            let _ = write!(
+                sections,
+                "        <div class=\"live-panel\" id=\"live-{anchor}\" hidden>\n          <div class=\"live-meta\"><span class=\"live-status\"></span><span class=\"live-time\"></span><button type=\"button\" class=\"live-close\" data-fb-close=\"{anchor}\">CLOSE</button></div>\n          <pre class=\"code live-body\" data-lang=\"response\"></pre>\n        </div>\n",
+                anchor = anchor,
+            );
 
             let mut sub_no = 0usize;
 
@@ -266,6 +298,14 @@ pub fn render_html(data: &CollectionData, title_override: Option<&str>) -> Strin
         nav.push_str("  </nav>\n");
     }
 
+    let payload_json =
+        serde_json::to_string(&Value::Array(payloads)).unwrap_or_else(|_| "[]".to_owned());
+    let secrets_warning = if has_secrets {
+        "<span class=\"warn\">CONTAINS RESOLVED SECRETS / DO NOT SHARE</span>"
+    } else {
+        ""
+    };
+
     let template = include_str!("docs_template.html");
     template
         .replace("{TITLE}", &esc(title))
@@ -276,6 +316,155 @@ pub fn render_html(data: &CollectionData, title_override: Option<&str>) -> Strin
         .replace("{GENERATED_AT}", &generated_at)
         .replace("{NAV}", &nav)
         .replace("{SECTIONS}", &sections)
+        .replace("{PAYLOAD_JSON}", &escape_for_script(&payload_json))
+        .replace("{SECRETS_WARNING}", secrets_warning)
+}
+
+fn escape_for_script(s: &str) -> String {
+    // Inside <script type="application/json"> the only sequence we have to
+    // escape is `</` to avoid prematurely terminating the script element.
+    s.replace("</", "<\\/")
+}
+
+fn has_real_secrets(auth: &Auth) -> bool {
+    match auth {
+        Auth::None => false,
+        Auth::Bearer { token } => !token.is_empty(),
+        Auth::Basic { password, .. } => !password.is_empty(),
+        Auth::ApiKey { value, .. } => !value.is_empty(),
+    }
+}
+
+fn build_payload(req: &SavedRequest, anchor: &str, supported: bool) -> Value {
+    let mut headers = serde_json::Map::new();
+    for (k, v) in &req.headers {
+        headers.insert(k.clone(), Value::String(v.clone()));
+    }
+    apply_auth_to_headers(&req.auth, &mut headers);
+
+    let body = match req.body_type {
+        BodyType::Raw => {
+            if req.body.is_empty() {
+                Value::Null
+            } else {
+                Value::String(req.body.clone())
+            }
+        }
+        BodyType::Form => {
+            let pairs: Vec<String> = req
+                .form_data
+                .iter()
+                .map(|(k, v)| format!("{}={}", url_encode(k), url_encode(v)))
+                .collect();
+            if pairs.is_empty() {
+                Value::Null
+            } else {
+                if !headers
+                    .keys()
+                    .any(|k| k.eq_ignore_ascii_case("content-type"))
+                {
+                    headers.insert(
+                        "Content-Type".to_owned(),
+                        Value::String("application/x-www-form-urlencoded".to_owned()),
+                    );
+                }
+                Value::String(pairs.join("&"))
+            }
+        }
+        BodyType::Multipart => Value::Null, // not worth replicating in the browser
+    };
+
+    if matches!(req.body_type, BodyType::Raw)
+        && !req.body.is_empty()
+        && !headers
+            .keys()
+            .any(|k| k.eq_ignore_ascii_case("content-type"))
+    {
+        headers.insert(
+            "Content-Type".to_owned(),
+            Value::String(req.content_type.mime().to_owned()),
+        );
+    }
+
+    let final_method = if req.method == "GQL" {
+        "POST".to_owned()
+    } else {
+        req.method.clone()
+    };
+
+    let final_body = if req.method == "GQL" {
+        let mut env = serde_json::Map::new();
+        env.insert("query".to_owned(), Value::String(req.body.clone()));
+        let vars = if req.gql_variables.trim().is_empty() {
+            Value::Object(serde_json::Map::new())
+        } else {
+            serde_json::from_str(&req.gql_variables)
+                .unwrap_or_else(|_| Value::Object(serde_json::Map::new()))
+        };
+        env.insert("variables".to_owned(), vars);
+        if !req.gql_operation_name.is_empty() {
+            env.insert(
+                "operationName".to_owned(),
+                Value::String(req.gql_operation_name.clone()),
+            );
+        }
+        if !headers
+            .keys()
+            .any(|k| k.eq_ignore_ascii_case("content-type"))
+        {
+            headers.insert(
+                "Content-Type".to_owned(),
+                Value::String("application/json".to_owned()),
+            );
+        }
+        Value::String(Value::Object(env).to_string())
+    } else {
+        body
+    };
+
+    json!({
+        "id": anchor,
+        "method": final_method,
+        "url": req.url,
+        "headers": Value::Object(headers),
+        "body": final_body,
+        "supported": supported,
+    })
+}
+
+fn apply_auth_to_headers(auth: &Auth, headers: &mut serde_json::Map<String, Value>) {
+    match auth {
+        Auth::Bearer { token } if !token.is_empty() => {
+            headers.insert(
+                "Authorization".to_owned(),
+                Value::String(format!("Bearer {token}")),
+            );
+        }
+        Auth::Basic { username, password } => {
+            let raw = format!("{username}:{password}");
+            let b64 = crate::curl::base64(raw.as_bytes());
+            headers.insert(
+                "Authorization".to_owned(),
+                Value::String(format!("Basic {b64}")),
+            );
+        }
+        Auth::ApiKey { header, value } if !header.is_empty() => {
+            headers.insert(header.clone(), Value::String(value.clone()));
+        }
+        _ => {}
+    }
+}
+
+fn url_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~') {
+            out.push(b as char);
+        } else {
+            let _ = write!(out, "%{b:02X}");
+        }
+    }
+    out
 }
 
 fn emit_spec_open(out: &mut String, n: usize, label: &str) {
