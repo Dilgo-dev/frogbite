@@ -135,121 +135,121 @@ fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> 
 /// Returns `true` when the app should quit.
 #[allow(clippy::too_many_lines)]
 fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
-    app.clipboard_msg = None;
-    if app.confirm_delete {
+    app.response.clipboard_msg = None;
+    if app.sidebar.confirm_delete {
         match key.code {
             KeyCode::Char('y') => app.request_delete(),
             _ => app.cancel_delete(),
         }
         return false;
     }
-    if app.view == View::Settings {
+    if app.ui.view == View::Settings {
         return handle_settings_key(app, key.code);
     }
-    if app.response_searching {
+    if app.response.searching {
         handle_search_key(app, key.code);
         return false;
     }
-    if app.form_editor.editing {
-        handle_kv_edit_key(&mut app.form_editor, key.code);
-        if !app.form_editor.editing {
+    if app.request.form_editor.editing {
+        handle_kv_edit_key(&mut app.request.form_editor, key.code);
+        if !app.request.form_editor.editing {
             app.sync_to_collection();
         }
         return false;
     }
-    if app.header_editor.editing {
-        handle_kv_edit_key(&mut app.header_editor, key.code);
-        if !app.header_editor.editing {
+    if app.request.header_editor.editing {
+        handle_kv_edit_key(&mut app.request.header_editor, key.code);
+        if !app.request.header_editor.editing {
             app.sync_to_collection();
         }
         return false;
     }
-    if app.param_editor.editing {
-        handle_kv_edit_key(&mut app.param_editor, key.code);
-        if !app.param_editor.editing {
+    if app.request.param_editor.editing {
+        handle_kv_edit_key(&mut app.request.param_editor, key.code);
+        if !app.request.param_editor.editing {
             app.sync_params_to_url();
         }
         return false;
     }
-    if app.auth_editing {
+    if app.auth.editing {
         handle_auth_edit_key(app, key.code);
         return false;
     }
-    if app.auth_selecting_type {
+    if app.auth.selecting_type {
         handle_auth_type_select_key(app, key.code);
         return false;
     }
-    if app.env_editing_var {
+    if app.env.editor.editing_var {
         handle_env_var_edit_key(app, key.code);
         return false;
     }
-    if app.env_editor_open {
+    if app.env.editor.open {
         handle_env_editor_key(app, key.code);
         return false;
     }
-    if app.env_renaming {
+    if app.env.renaming {
         handle_env_rename_key(app, key.code);
         return false;
     }
-    if app.env_import_open {
+    if app.env.import.open {
         handle_env_import_key(app, key.code);
         return false;
     }
-    if app.timeout_popup_open {
+    if app.timeout.popup_open {
         handle_timeout_popup_key(app, key.code);
         return false;
     }
-    if app.tls_popup_open {
+    if app.tls.popup_open {
         handle_tls_popup_key(app, key.code);
         return false;
     }
-    if app.cookies_popup_open {
+    if app.cookies.popup_open {
         handle_cookies_popup_key(app, key.code);
         return false;
     }
-    if app.extractors_popup_open {
+    if app.extractors.popup_open {
         handle_extractors_popup_key(app, key.code);
         return false;
     }
-    if app.assertions_popup_open {
+    if app.assertions.popup_open {
         handle_assertions_popup_key(app, key.code);
         return false;
     }
-    if app.env_popup_open {
+    if app.env.popup_open {
         handle_env_popup_key(app, key.code);
         return false;
     }
-    if app.curl_export_open {
+    if app.curl_io.export_open {
         if key.code == KeyCode::Esc {
-            app.curl_export_open = false;
+            app.curl_io.export_open = false;
         }
         return false;
     }
-    if app.postman_import_open {
+    if app.postman_io.open {
         handle_postman_import_key(app, key);
         return false;
     }
-    if app.curl_import_open {
+    if app.curl_io.import_open {
         handle_curl_import_key(app, key);
         return false;
     }
-    if app.history_open {
+    if app.history.open {
         handle_history_key(app, key.code);
         return false;
     }
-    if app.method_popup {
+    if app.method_popup.open {
         handle_method_popup_key(app, key.code);
         return false;
     }
-    if app.editing_sidebar_name {
+    if app.sidebar.editing_name {
         handle_sidebar_edit_key(app, key.code);
         return false;
     }
-    if app.editing_url {
+    if app.request.editing_url {
         handle_url_edit_key(app, key.code);
         return false;
     }
-    if app.editing_body {
+    if app.request.editing_body {
         handle_body_edit_key(app, key.code);
         return false;
     }
@@ -258,15 +258,15 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
 
 fn handle_settings_key(app: &mut App, key: KeyCode) -> bool {
     match key {
-        KeyCode::Esc | KeyCode::Char('s') => app.view = View::Main,
+        KeyCode::Esc | KeyCode::Char('s') => app.ui.view = View::Main,
         KeyCode::Char('j') | KeyCode::Down => {
             let max = app.settings_items().len().saturating_sub(1);
-            if app.settings_selected < max {
-                app.settings_selected += 1;
+            if app.ui.settings_selected < max {
+                app.ui.settings_selected += 1;
             }
         }
         KeyCode::Char('k') | KeyCode::Up => {
-            app.settings_selected = app.settings_selected.saturating_sub(1);
+            app.ui.settings_selected = app.ui.settings_selected.saturating_sub(1);
         }
         KeyCode::Enter | KeyCode::Char(' ') => app.toggle_setting(),
         KeyCode::Char('q') => return true,
@@ -277,15 +277,15 @@ fn handle_settings_key(app: &mut App, key: KeyCode) -> bool {
 
 fn handle_history_key(app: &mut App, key: KeyCode) {
     match key {
-        KeyCode::Esc | KeyCode::Char('h') => app.history_open = false,
+        KeyCode::Esc | KeyCode::Char('h') => app.history.open = false,
         KeyCode::Char('j') | KeyCode::Down => {
-            let max = app.history.len().saturating_sub(1);
-            if app.history_selected < max {
-                app.history_selected += 1;
+            let max = app.history.entries.len().saturating_sub(1);
+            if app.history.selected < max {
+                app.history.selected += 1;
             }
         }
         KeyCode::Char('k') | KeyCode::Up => {
-            app.history_selected = app.history_selected.saturating_sub(1);
+            app.history.selected = app.history.selected.saturating_sub(1);
         }
         KeyCode::Enter => app.load_from_history(),
         _ => {}
@@ -294,15 +294,15 @@ fn handle_history_key(app: &mut App, key: KeyCode) {
 
 fn handle_method_popup_key(app: &mut App, key: KeyCode) {
     match key {
-        KeyCode::Esc => app.method_popup = false,
+        KeyCode::Esc => app.method_popup.open = false,
         KeyCode::Char('j') | KeyCode::Down => {
             let max = Method::all().len().saturating_sub(1);
-            if app.method_popup_selected < max {
-                app.method_popup_selected += 1;
+            if app.method_popup.selected < max {
+                app.method_popup.selected += 1;
             }
         }
         KeyCode::Char('k') | KeyCode::Up => {
-            app.method_popup_selected = app.method_popup_selected.saturating_sub(1);
+            app.method_popup.selected = app.method_popup.selected.saturating_sub(1);
         }
         KeyCode::Enter => app.confirm_method_popup(),
         _ => {}
@@ -311,15 +311,15 @@ fn handle_method_popup_key(app: &mut App, key: KeyCode) {
 
 fn handle_postman_import_key(app: &mut App, key: &event::KeyEvent) {
     match key.code {
-        KeyCode::Esc => app.postman_import_open = false,
+        KeyCode::Esc => app.postman_io.open = false,
         KeyCode::Enter => app.confirm_postman_import(),
         KeyCode::Backspace => {
-            app.postman_import_buffer.pop();
-            app.postman_import_error = false;
+            app.postman_io.buffer.pop();
+            app.postman_io.error = false;
         }
         KeyCode::Char(c) => {
-            app.postman_import_buffer.push(c);
-            app.postman_import_error = false;
+            app.postman_io.buffer.push(c);
+            app.postman_io.error = false;
         }
         _ => {}
     }
@@ -327,21 +327,21 @@ fn handle_postman_import_key(app: &mut App, key: &event::KeyEvent) {
 
 fn handle_curl_import_key(app: &mut App, key: &event::KeyEvent) {
     match key.code {
-        KeyCode::Esc => app.curl_import_open = false,
+        KeyCode::Esc => app.curl_io.import_open = false,
         KeyCode::Enter => {
-            app.curl_import_buffer.push('\n');
-            app.curl_import_error = false;
+            app.curl_io.import_buffer.push('\n');
+            app.curl_io.import_error = false;
         }
         KeyCode::Backspace => {
-            app.curl_import_buffer.pop();
-            app.curl_import_error = false;
+            app.curl_io.import_buffer.pop();
+            app.curl_io.import_error = false;
         }
         KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.confirm_curl_import();
         }
         KeyCode::Char(c) => {
-            app.curl_import_buffer.push(c);
-            app.curl_import_error = false;
+            app.curl_io.import_buffer.push(c);
+            app.curl_io.import_error = false;
         }
         _ => {}
     }
@@ -349,12 +349,12 @@ fn handle_curl_import_key(app: &mut App, key: &event::KeyEvent) {
 
 fn handle_sidebar_edit_key(app: &mut App, key: KeyCode) {
     match key {
-        KeyCode::Esc => app.editing_sidebar_name = false,
+        KeyCode::Esc => app.sidebar.editing_name = false,
         KeyCode::Enter => app.confirm_editing_name(),
         KeyCode::Backspace => {
-            app.sidebar_edit_buffer.pop();
+            app.sidebar.edit_buffer.pop();
         }
-        KeyCode::Char(c) => app.sidebar_edit_buffer.push(c),
+        KeyCode::Char(c) => app.sidebar.edit_buffer.push(c),
         _ => {}
     }
 }
@@ -400,9 +400,9 @@ fn handle_search_key(app: &mut App, key: KeyCode) {
         KeyCode::Esc => app.cancel_search(),
         KeyCode::Enter => app.confirm_search(),
         KeyCode::Backspace => {
-            app.response_search_buf.pop();
+            app.response.search_buf.pop();
         }
-        KeyCode::Char(c) => app.response_search_buf.push(c),
+        KeyCode::Char(c) => app.response.search_buf.push(c),
         _ => {}
     }
 }
@@ -432,14 +432,14 @@ fn handle_kv_edit_key(editor: &mut app::KvEditorState, key: KeyCode) {
 
 fn handle_auth_type_select_key(app: &mut App, key: KeyCode) {
     match key {
-        KeyCode::Esc => app.auth_selecting_type = false,
+        KeyCode::Esc => app.auth.selecting_type = false,
         KeyCode::Char('j') | KeyCode::Down => {
-            if app.auth_type_selected < App::AUTH_TYPES.len() - 1 {
-                app.auth_type_selected += 1;
+            if app.auth.type_selected < App::AUTH_TYPES.len() - 1 {
+                app.auth.type_selected += 1;
             }
         }
         KeyCode::Char('k') | KeyCode::Up => {
-            app.auth_type_selected = app.auth_type_selected.saturating_sub(1);
+            app.auth.type_selected = app.auth.type_selected.saturating_sub(1);
         }
         KeyCode::Enter => app.select_auth_type(),
         _ => {}
@@ -447,23 +447,23 @@ fn handle_auth_type_select_key(app: &mut App, key: KeyCode) {
 }
 
 fn handle_auth_edit_key(app: &mut App, key: KeyCode) {
-    let has_two_fields = !matches!(&app.auth, collections::Auth::Bearer { .. });
+    let has_two_fields = !matches!(&app.auth.config, collections::Auth::Bearer { .. });
     match key {
-        KeyCode::Esc => app.auth_editing = false,
-        KeyCode::Tab if has_two_fields => app.auth_field = 1 - app.auth_field,
+        KeyCode::Esc => app.auth.editing = false,
+        KeyCode::Tab if has_two_fields => app.auth.field = 1 - app.auth.field,
         KeyCode::Enter => app.confirm_auth_edit(),
         KeyCode::Backspace => {
-            if app.auth_field == 0 {
-                app.auth_buf_a.pop();
+            if app.auth.field == 0 {
+                app.auth.buf_a.pop();
             } else {
-                app.auth_buf_b.pop();
+                app.auth.buf_b.pop();
             }
         }
         KeyCode::Char(c) => {
-            if app.auth_field == 0 {
-                app.auth_buf_a.push(c);
+            if app.auth.field == 0 {
+                app.auth.buf_a.push(c);
             } else {
-                app.auth_buf_b.push(c);
+                app.auth.buf_b.push(c);
             }
         }
         _ => {}
@@ -472,15 +472,15 @@ fn handle_auth_edit_key(app: &mut App, key: KeyCode) {
 
 fn handle_env_popup_key(app: &mut App, key: KeyCode) {
     match key {
-        KeyCode::Esc => app.env_popup_open = false,
+        KeyCode::Esc => app.env.popup_open = false,
         KeyCode::Char('j') | KeyCode::Down => {
             let max = app.env_popup_count().saturating_sub(1);
-            if app.env_popup_selected < max {
-                app.env_popup_selected += 1;
+            if app.env.popup_selected < max {
+                app.env.popup_selected += 1;
             }
         }
         KeyCode::Char('k') | KeyCode::Up => {
-            app.env_popup_selected = app.env_popup_selected.saturating_sub(1);
+            app.env.popup_selected = app.env.popup_selected.saturating_sub(1);
         }
         KeyCode::Enter => app.select_env_from_popup(),
         KeyCode::Char('a') => app.create_environment(),
@@ -497,9 +497,9 @@ fn handle_env_rename_key(app: &mut App, key: KeyCode) {
         KeyCode::Esc => app.cancel_env_rename(),
         KeyCode::Enter => app.confirm_env_rename(),
         KeyCode::Backspace => {
-            app.env_name_buffer.pop();
+            app.env.name_buffer.pop();
         }
-        KeyCode::Char(c) => app.env_name_buffer.push(c),
+        KeyCode::Char(c) => app.env.name_buffer.push(c),
         _ => {}
     }
 }
@@ -507,17 +507,17 @@ fn handle_env_rename_key(app: &mut App, key: KeyCode) {
 fn handle_env_editor_key(app: &mut App, key: KeyCode) {
     match key {
         KeyCode::Esc => {
-            app.env_editor_open = false;
-            app.env_popup_open = true;
+            app.env.editor.open = false;
+            app.env.popup_open = true;
         }
         KeyCode::Char('j') | KeyCode::Down => {
             let max = app.env_editor_count().saturating_sub(1);
-            if app.env_editor_selected < max {
-                app.env_editor_selected += 1;
+            if app.env.editor.selected < max {
+                app.env.editor.selected += 1;
             }
         }
         KeyCode::Char('k') | KeyCode::Up => {
-            app.env_editor_selected = app.env_editor_selected.saturating_sub(1);
+            app.env.editor.selected = app.env.editor.selected.saturating_sub(1);
         }
         KeyCode::Char('a') | KeyCode::Enter => app.start_edit_var(),
         KeyCode::Char('d') => app.delete_var(),
@@ -528,21 +528,21 @@ fn handle_env_editor_key(app: &mut App, key: KeyCode) {
 
 fn handle_env_var_edit_key(app: &mut App, key: KeyCode) {
     match key {
-        KeyCode::Esc => app.env_editing_var = false,
-        KeyCode::Tab => app.env_var_field = 1 - app.env_var_field,
+        KeyCode::Esc => app.env.editor.editing_var = false,
+        KeyCode::Tab => app.env.editor.var_field = 1 - app.env.editor.var_field,
         KeyCode::Enter => app.confirm_var_edit(),
         KeyCode::Backspace => {
-            if app.env_var_field == 0 {
-                app.env_var_key_buffer.pop();
+            if app.env.editor.var_field == 0 {
+                app.env.editor.var_key_buffer.pop();
             } else {
-                app.env_var_value_buffer.pop();
+                app.env.editor.var_value_buffer.pop();
             }
         }
         KeyCode::Char(c) => {
-            if app.env_var_field == 0 {
-                app.env_var_key_buffer.push(c);
+            if app.env.editor.var_field == 0 {
+                app.env.editor.var_key_buffer.push(c);
             } else {
-                app.env_var_value_buffer.push(c);
+                app.env.editor.var_value_buffer.push(c);
             }
         }
         _ => {}
@@ -550,20 +550,20 @@ fn handle_env_var_edit_key(app: &mut App, key: KeyCode) {
 }
 
 fn handle_assertions_popup_key(app: &mut App, key: KeyCode) {
-    if app.assertion_editing {
+    if app.assertions.editing {
         match key {
-            KeyCode::Esc => app.assertion_editing = false,
+            KeyCode::Esc => app.assertions.editing = false,
             KeyCode::Enter => app.assertions_confirm_edit(),
             KeyCode::Backspace => {
-                app.assertion_edit_buffer.pop();
+                app.assertions.edit_buffer.pop();
             }
-            KeyCode::Char(c) => app.assertion_edit_buffer.push(c),
+            KeyCode::Char(c) => app.assertions.edit_buffer.push(c),
             _ => {}
         }
         return;
     }
     match key {
-        KeyCode::Esc | KeyCode::Char('q') => app.assertions_popup_open = false,
+        KeyCode::Esc | KeyCode::Char('q') => app.assertions.popup_open = false,
         KeyCode::Char('j') | KeyCode::Down => app.assertions_popup_down(),
         KeyCode::Char('k') | KeyCode::Up => app.assertions_popup_up(),
         KeyCode::Char('a') => app.assertions_start_add(),
@@ -574,21 +574,21 @@ fn handle_assertions_popup_key(app: &mut App, key: KeyCode) {
 }
 
 fn handle_extractors_popup_key(app: &mut App, key: KeyCode) {
-    if app.extractor_editor.editing {
-        handle_kv_edit_key(&mut app.extractor_editor, key);
-        if !app.extractor_editor.editing {
+    if app.extractors.editor.editing {
+        handle_kv_edit_key(&mut app.extractors.editor, key);
+        if !app.extractors.editor.editing {
             app.sync_to_collection();
         }
         return;
     }
     match key {
-        KeyCode::Esc | KeyCode::Char('q') => app.extractors_popup_open = false,
-        KeyCode::Char('j') | KeyCode::Down => app.extractor_editor.move_down(),
-        KeyCode::Char('k') | KeyCode::Up => app.extractor_editor.move_up(),
-        KeyCode::Char('a') => app.extractor_editor.start_add(),
-        KeyCode::Char('e') | KeyCode::Enter => app.extractor_editor.start_edit(),
+        KeyCode::Esc | KeyCode::Char('q') => app.extractors.popup_open = false,
+        KeyCode::Char('j') | KeyCode::Down => app.extractors.editor.move_down(),
+        KeyCode::Char('k') | KeyCode::Up => app.extractors.editor.move_up(),
+        KeyCode::Char('a') => app.extractors.editor.start_add(),
+        KeyCode::Char('e') | KeyCode::Enter => app.extractors.editor.start_edit(),
         KeyCode::Char('d') => {
-            app.extractor_editor.delete_selected();
+            app.extractors.editor.delete_selected();
             app.sync_to_collection();
         }
         _ => {}
@@ -597,7 +597,7 @@ fn handle_extractors_popup_key(app: &mut App, key: KeyCode) {
 
 fn handle_cookies_popup_key(app: &mut App, key: KeyCode) {
     match key {
-        KeyCode::Esc | KeyCode::Char('q') => app.cookies_popup_open = false,
+        KeyCode::Esc | KeyCode::Char('q') => app.cookies.popup_open = false,
         KeyCode::Char('j') | KeyCode::Down => app.cookies_popup_down(),
         KeyCode::Char('k') | KeyCode::Up => app.cookies_popup_up(),
         KeyCode::Char('d') => app.cookies_popup_delete(),
@@ -607,23 +607,23 @@ fn handle_cookies_popup_key(app: &mut App, key: KeyCode) {
 }
 
 fn handle_tls_popup_key(app: &mut App, key: KeyCode) {
-    if app.tls_editing {
+    if app.tls.editing {
         match key {
             KeyCode::Esc => {
-                app.tls_editing = false;
-                app.tls_edit_buffer.clear();
+                app.tls.editing = false;
+                app.tls.edit_buffer.clear();
             }
             KeyCode::Enter => app.tls_confirm_edit(),
             KeyCode::Backspace => {
-                app.tls_edit_buffer.pop();
+                app.tls.edit_buffer.pop();
             }
-            KeyCode::Char(c) => app.tls_edit_buffer.push(c),
+            KeyCode::Char(c) => app.tls.edit_buffer.push(c),
             _ => {}
         }
         return;
     }
     match key {
-        KeyCode::Esc => app.tls_popup_open = false,
+        KeyCode::Esc => app.tls.popup_open = false,
         KeyCode::Char('j') | KeyCode::Down => app.tls_popup_down(),
         KeyCode::Char('k') | KeyCode::Up => app.tls_popup_up(),
         KeyCode::Enter | KeyCode::Char(' ' | 'e') => app.tls_popup_activate(),
@@ -634,15 +634,15 @@ fn handle_tls_popup_key(app: &mut App, key: KeyCode) {
 
 fn handle_timeout_popup_key(app: &mut App, key: KeyCode) {
     match key {
-        KeyCode::Esc => app.timeout_popup_open = false,
+        KeyCode::Esc => app.timeout.popup_open = false,
         KeyCode::Enter => app.confirm_timeout_popup(),
         KeyCode::Backspace => {
-            app.timeout_buffer.pop();
-            app.timeout_error = false;
+            app.timeout.buffer.pop();
+            app.timeout.error = false;
         }
         KeyCode::Char(c) if c.is_ascii_digit() => {
-            app.timeout_buffer.push(c);
-            app.timeout_error = false;
+            app.timeout.buffer.push(c);
+            app.timeout.error = false;
         }
         _ => {}
     }
@@ -650,15 +650,15 @@ fn handle_timeout_popup_key(app: &mut App, key: KeyCode) {
 
 fn handle_env_import_key(app: &mut App, key: KeyCode) {
     match key {
-        KeyCode::Esc => app.env_import_open = false,
+        KeyCode::Esc => app.env.import.open = false,
         KeyCode::Enter => app.confirm_env_import(),
         KeyCode::Backspace => {
-            app.env_import_buffer.pop();
-            app.env_import_error = false;
+            app.env.import.buffer.pop();
+            app.env.import.error = false;
         }
         KeyCode::Char(c) => {
-            app.env_import_buffer.push(c);
-            app.env_import_error = false;
+            app.env.import.buffer.push(c);
+            app.env.import.error = false;
         }
         _ => {}
     }
@@ -671,7 +671,7 @@ fn handle_sidebar_key(app: &mut App, key: KeyCode) -> bool {
             app.save_collections();
             return true;
         }
-        KeyCode::Char('s') => app.view = View::Settings,
+        KeyCode::Char('s') => app.ui.view = View::Settings,
         KeyCode::Char('h') => app.open_history(),
         KeyCode::Char('E') => app.open_env_popup(),
         KeyCode::Char('r') => app.start_editing_name(),
@@ -685,12 +685,12 @@ fn handle_sidebar_key(app: &mut App, key: KeyCode) -> bool {
         KeyCode::Char('c') => app.open_curl_export(),
         KeyCode::Char('j') | KeyCode::Down => {
             let max = app.sidebar_len().saturating_sub(1);
-            if app.sidebar_selected < max {
-                app.sidebar_selected += 1;
+            if app.sidebar.selected < max {
+                app.sidebar.selected += 1;
             }
         }
         KeyCode::Char('k') | KeyCode::Up => {
-            app.sidebar_selected = app.sidebar_selected.saturating_sub(1);
+            app.sidebar.selected = app.sidebar.selected.saturating_sub(1);
         }
         KeyCode::Enter => {
             let is_folder = matches!(
@@ -699,10 +699,10 @@ fn handle_sidebar_key(app: &mut App, key: KeyCode) -> bool {
             );
             app.load_selected();
             if !is_folder {
-                app.focus = Focus::UrlBar;
+                app.ui.focus = Focus::UrlBar;
             }
         }
-        KeyCode::Tab => app.focus = Focus::UrlBar,
+        KeyCode::Tab => app.ui.focus = Focus::UrlBar,
         _ => {}
     }
     false
@@ -711,86 +711,86 @@ fn handle_sidebar_key(app: &mut App, key: KeyCode) -> bool {
 fn handle_request_panel_key(app: &mut App, key: KeyCode) -> bool {
     match key {
         KeyCode::Char('q') => return true,
-        KeyCode::Char('s') => app.view = View::Settings,
+        KeyCode::Char('s') => app.ui.view = View::Settings,
         KeyCode::Char('h') => app.open_history(),
         KeyCode::Char('E') => app.open_env_popup(),
-        KeyCode::Char('1') => app.request_tab = RequestTab::Body,
-        KeyCode::Char('2') => app.request_tab = RequestTab::Headers,
-        KeyCode::Char('3' | 'A') => app.request_tab = RequestTab::Auth,
-        KeyCode::Char('4') => app.request_tab = RequestTab::Params,
-        KeyCode::Char('b') if app.request_tab == RequestTab::Body => {
-            app.body_type = app.body_type.next();
+        KeyCode::Char('1') => app.request.tab = RequestTab::Body,
+        KeyCode::Char('2') => app.request.tab = RequestTab::Headers,
+        KeyCode::Char('3' | 'A') => app.request.tab = RequestTab::Auth,
+        KeyCode::Char('4') => app.request.tab = RequestTab::Params,
+        KeyCode::Char('b') if app.request.tab == RequestTab::Body => {
+            app.request.body_type = app.request.body_type.next();
             app.sync_to_collection();
         }
         KeyCode::Char('c')
-            if app.request_tab == RequestTab::Body
-                && app.body_type == collections::BodyType::Raw =>
+            if app.request.tab == RequestTab::Body
+                && app.request.body_type == collections::BodyType::Raw =>
         {
-            app.content_type = app.content_type.next();
+            app.request.content_type = app.request.content_type.next();
             app.sync_to_collection();
         }
-        KeyCode::Char('e' | 'i') => match app.request_tab {
-            RequestTab::Body if app.body_type == collections::BodyType::Raw => {
+        KeyCode::Char('e' | 'i') => match app.request.tab {
+            RequestTab::Body if app.request.body_type == collections::BodyType::Raw => {
                 app.enter_body_edit();
             }
-            RequestTab::Body => app.form_editor.start_edit(),
-            RequestTab::Headers => app.header_editor.start_edit(),
-            RequestTab::Params => app.param_editor.start_edit(),
+            RequestTab::Body => app.request.form_editor.start_edit(),
+            RequestTab::Headers => app.request.header_editor.start_edit(),
+            RequestTab::Params => app.request.param_editor.start_edit(),
             RequestTab::Auth => {
-                if app.auth == collections::Auth::None {
-                    app.auth_type_selected = app.auth_type_index();
-                    app.auth_selecting_type = true;
+                if app.auth.config == collections::Auth::None {
+                    app.auth.type_selected = app.auth_type_index();
+                    app.auth.selecting_type = true;
                 } else {
                     app.open_auth_edit();
                 }
             }
         },
-        KeyCode::Char('t') if app.request_tab == RequestTab::Auth => {
-            app.auth_type_selected = app.auth_type_index();
-            app.auth_selecting_type = true;
+        KeyCode::Char('t') if app.request.tab == RequestTab::Auth => {
+            app.auth.type_selected = app.auth_type_index();
+            app.auth.selecting_type = true;
         }
-        KeyCode::Char('a') => match app.request_tab {
-            RequestTab::Body if app.body_type != collections::BodyType::Raw => {
-                app.form_editor.start_add();
+        KeyCode::Char('a') => match app.request.tab {
+            RequestTab::Body if app.request.body_type != collections::BodyType::Raw => {
+                app.request.form_editor.start_add();
             }
-            RequestTab::Headers => app.header_editor.start_add(),
-            RequestTab::Params => app.param_editor.start_add(),
+            RequestTab::Headers => app.request.header_editor.start_add(),
+            RequestTab::Params => app.request.param_editor.start_add(),
             RequestTab::Body | RequestTab::Auth => {}
         },
-        KeyCode::Char('d') => match app.request_tab {
-            RequestTab::Body if app.body_type != collections::BodyType::Raw => {
-                app.form_editor.delete_selected();
+        KeyCode::Char('d') => match app.request.tab {
+            RequestTab::Body if app.request.body_type != collections::BodyType::Raw => {
+                app.request.form_editor.delete_selected();
                 app.sync_to_collection();
             }
             RequestTab::Headers => {
-                app.header_editor.delete_selected();
+                app.request.header_editor.delete_selected();
                 app.sync_to_collection();
             }
             RequestTab::Params => {
-                app.param_editor.delete_selected();
+                app.request.param_editor.delete_selected();
                 app.sync_params_to_url();
             }
             RequestTab::Body | RequestTab::Auth => {}
         },
-        KeyCode::Char('j') | KeyCode::Down => match app.request_tab {
-            RequestTab::Body if app.body_type != collections::BodyType::Raw => {
-                app.form_editor.move_down();
+        KeyCode::Char('j') | KeyCode::Down => match app.request.tab {
+            RequestTab::Body if app.request.body_type != collections::BodyType::Raw => {
+                app.request.form_editor.move_down();
             }
-            RequestTab::Headers => app.header_editor.move_down(),
-            RequestTab::Params => app.param_editor.move_down(),
+            RequestTab::Headers => app.request.header_editor.move_down(),
+            RequestTab::Params => app.request.param_editor.move_down(),
             RequestTab::Body | RequestTab::Auth => {}
         },
-        KeyCode::Char('k') | KeyCode::Up => match app.request_tab {
-            RequestTab::Body if app.body_type != collections::BodyType::Raw => {
-                app.form_editor.move_up();
+        KeyCode::Char('k') | KeyCode::Up => match app.request.tab {
+            RequestTab::Body if app.request.body_type != collections::BodyType::Raw => {
+                app.request.form_editor.move_up();
             }
-            RequestTab::Headers => app.header_editor.move_up(),
-            RequestTab::Params => app.param_editor.move_up(),
+            RequestTab::Headers => app.request.header_editor.move_up(),
+            RequestTab::Params => app.request.param_editor.move_up(),
             RequestTab::Body | RequestTab::Auth => {}
         },
         KeyCode::Enter => app.send_request(),
-        KeyCode::Tab => app.focus = Focus::Response,
-        KeyCode::BackTab => app.focus = Focus::UrlBar,
+        KeyCode::Tab => app.ui.focus = Focus::Response,
+        KeyCode::BackTab => app.ui.focus = Focus::UrlBar,
         _ => {}
     }
     false
@@ -798,20 +798,20 @@ fn handle_request_panel_key(app: &mut App, key: KeyCode) -> bool {
 
 /// Returns `true` when the app should quit.
 fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
-    match app.focus {
+    match app.ui.focus {
         Focus::Sidebar => return handle_sidebar_key(app, key),
         Focus::UrlBar => match key {
             KeyCode::Char('q') => return true,
-            KeyCode::Char('s') => app.view = View::Settings,
+            KeyCode::Char('s') => app.ui.view = View::Settings,
             KeyCode::Char('h') => app.open_history(),
             KeyCode::Char('E') => app.open_env_popup(),
             KeyCode::Char('A') => {
-                app.request_tab = RequestTab::Auth;
-                app.focus = Focus::Body;
+                app.request.tab = RequestTab::Auth;
+                app.ui.focus = Focus::Body;
             }
             KeyCode::Char('e' | 'i') => {
-                app.editing_url = true;
-                app.cursor_pos = app.url.len();
+                app.request.editing_url = true;
+                app.request.cursor_pos = app.request.url.len();
             }
             KeyCode::Char('m') => app.open_method_popup(),
             KeyCode::Char('R') => app.toggle_follow_redirects(),
@@ -821,35 +821,35 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('X') => app.open_extractors_popup(),
             KeyCode::Char('V') => app.open_assertions_popup(),
             KeyCode::Enter => app.send_request(),
-            KeyCode::Tab => app.focus = Focus::Body,
-            KeyCode::BackTab => app.focus = Focus::Sidebar,
+            KeyCode::Tab => app.ui.focus = Focus::Body,
+            KeyCode::BackTab => app.ui.focus = Focus::Sidebar,
             _ => {}
         },
         Focus::Body => return handle_request_panel_key(app, key),
         Focus::Response => match key {
             KeyCode::Char('q') => return true,
-            KeyCode::Char('s') => app.view = View::Settings,
+            KeyCode::Char('s') => app.ui.view = View::Settings,
             KeyCode::Char('h') => app.open_history(),
             KeyCode::Char('E') => app.open_env_popup(),
             KeyCode::Char('A') => {
-                app.request_tab = RequestTab::Auth;
-                app.focus = Focus::Body;
+                app.request.tab = RequestTab::Auth;
+                app.ui.focus = Focus::Body;
             }
             KeyCode::Char('j') | KeyCode::Down => {
-                app.response_scroll = app.response_scroll.saturating_add(1);
+                app.response.scroll = app.response.scroll.saturating_add(1);
             }
             KeyCode::Char('k') | KeyCode::Up => {
-                app.response_scroll = app.response_scroll.saturating_sub(1);
+                app.response.scroll = app.response.scroll.saturating_sub(1);
             }
-            KeyCode::Char('1') => app.response_tab = ResponseTab::Body,
-            KeyCode::Char('2') => app.response_tab = ResponseTab::Headers,
+            KeyCode::Char('1') => app.response.tab = ResponseTab::Body,
+            KeyCode::Char('2') => app.response.tab = ResponseTab::Headers,
             KeyCode::Char('/') => app.open_search(),
             KeyCode::Char('n') => app.next_match(),
             KeyCode::Char('N') => app.prev_match(),
             KeyCode::Char('y') => app.copy_response_to_clipboard(),
             KeyCode::Esc => app.clear_search(),
-            KeyCode::Tab => app.focus = Focus::Sidebar,
-            KeyCode::BackTab => app.focus = Focus::Body,
+            KeyCode::Tab => app.ui.focus = Focus::Sidebar,
+            KeyCode::BackTab => app.ui.focus = Focus::Body,
             _ => {}
         },
     }

@@ -32,7 +32,7 @@ pub(super) fn draw_method_popup(frame: &mut Frame, app: &App) {
             break;
         }
         let row = Rect::new(inner.x, row_y, inner.width, 1);
-        let selected = i == app.method_popup_selected;
+        let selected = i == app.method_popup.selected;
 
         if selected {
             frame.render_widget(Paragraph::new("").bg(SURFACE), row);
@@ -73,7 +73,7 @@ pub(super) fn draw_history_overlay(frame: &mut Frame, app: &App) {
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
-    if app.history.is_empty() {
+    if app.history.entries.is_empty() {
         let msg = Paragraph::new(Text::styled(
             "No history yet",
             Style::default().fg(MUTED).italic(),
@@ -83,12 +83,12 @@ pub(super) fn draw_history_overlay(frame: &mut Frame, app: &App) {
         return;
     }
 
-    for (i, entry) in app.history.iter().rev().enumerate() {
+    for (i, entry) in app.history.entries.iter().rev().enumerate() {
         let row_y = inner.y + i as u16;
         if row_y >= inner.y + inner.height {
             break;
         }
-        let selected = i == app.history_selected;
+        let selected = i == app.history.selected;
         let row = Rect::new(inner.x, row_y, inner.width, 1);
 
         if selected {
@@ -148,12 +148,12 @@ pub(super) fn draw_curl_import_popup(frame: &mut Frame, app: &App) {
 
     frame.render_widget(Clear, popup_area);
 
-    let title = if app.curl_import_error {
+    let title = if app.curl_io.import_error {
         " Import cURL (invalid) "
     } else {
         " Import cURL "
     };
-    let title_style = if app.curl_import_error {
+    let title_style = if app.curl_io.import_error {
         Style::default().fg(RED).bold()
     } else {
         Style::default().fg(GREEN).bold()
@@ -163,7 +163,7 @@ pub(super) fn draw_curl_import_popup(frame: &mut Frame, app: &App) {
         .title(title)
         .title_style(title_style)
         .borders(Borders::ALL)
-        .border_style(if app.curl_import_error {
+        .border_style(if app.curl_io.import_error {
             Style::default().fg(RED)
         } else {
             Style::default().fg(GREEN)
@@ -173,7 +173,7 @@ pub(super) fn draw_curl_import_popup(frame: &mut Frame, app: &App) {
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
-    let display = format!("{}\u{2588}", &app.curl_import_buffer);
+    let display = format!("{}\u{2588}", &app.curl_io.import_buffer);
     let paragraph = Paragraph::new(Text::styled(&display, Style::default().fg(FG)))
         .wrap(ratatui::widgets::Wrap { trim: false });
     frame.render_widget(paragraph, inner);
@@ -200,7 +200,7 @@ pub(super) fn draw_curl_export_popup(frame: &mut Frame, app: &App) {
     frame.render_widget(block, popup_area);
 
     let paragraph = Paragraph::new(Text::styled(
-        &app.curl_export_content,
+        &app.curl_io.export_content,
         Style::default().fg(FG),
     ))
     .wrap(ratatui::widgets::Wrap { trim: false });
@@ -217,12 +217,12 @@ pub(super) fn draw_postman_import_popup(frame: &mut Frame, app: &App) {
 
     frame.render_widget(Clear, popup_area);
 
-    let title = if app.postman_import_error {
+    let title = if app.postman_io.error {
         " Import Postman (invalid) "
     } else {
         " Import Postman "
     };
-    let title_style = if app.postman_import_error {
+    let title_style = if app.postman_io.error {
         Style::default().fg(RED).bold()
     } else {
         Style::default().fg(GREEN).bold()
@@ -232,7 +232,7 @@ pub(super) fn draw_postman_import_popup(frame: &mut Frame, app: &App) {
         .title(title)
         .title_style(title_style)
         .borders(Borders::ALL)
-        .border_style(if app.postman_import_error {
+        .border_style(if app.postman_io.error {
             Style::default().fg(RED)
         } else {
             Style::default().fg(GREEN)
@@ -242,7 +242,7 @@ pub(super) fn draw_postman_import_popup(frame: &mut Frame, app: &App) {
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
-    let display = format!("{}\u{2588}", &app.postman_import_buffer);
+    let display = format!("{}\u{2588}", &app.postman_io.buffer);
     let lines = vec![
         Line::from(Span::styled(
             "Path to collection JSON:",
@@ -281,8 +281,8 @@ pub(super) fn draw_env_popup(frame: &mut Frame, app: &App) {
     let row_y = inner.y;
     if row_y < inner.y + inner.height {
         let row = Rect::new(inner.x, row_y, inner.width, 1);
-        let selected = app.env_popup_selected == 0;
-        let is_active = app.active_env_id.is_none();
+        let selected = app.env.popup_selected == 0;
+        let is_active = app.env.active_id.is_none();
 
         if selected {
             frame.render_widget(Paragraph::new("").bg(SURFACE), row);
@@ -308,27 +308,27 @@ pub(super) fn draw_env_popup(frame: &mut Frame, app: &App) {
     }
 
     // Environment rows
-    for (i, env) in app.environments.iter().enumerate() {
+    for (i, env) in app.env.environments.iter().enumerate() {
         let row_y = inner.y + (i as u16 + 1);
         if row_y >= inner.y + inner.height {
             break;
         }
         let row = Rect::new(inner.x, row_y, inner.width, 1);
         let idx = i + 1;
-        let selected = app.env_popup_selected == idx;
-        let is_active = app.active_env_id.as_deref() == Some(&env.id);
+        let selected = app.env.popup_selected == idx;
+        let is_active = app.env.active_id.as_deref() == Some(&env.id);
 
         if selected {
             frame.render_widget(Paragraph::new("").bg(SURFACE), row);
         }
 
         let dot = if is_active { "\u{25cf}" } else { "\u{25cb}" };
-        let name = if app.env_renaming && selected {
-            format!("{}\u{2588}", &app.env_name_buffer)
+        let name = if app.env.renaming && selected {
+            format!("{}\u{2588}", &app.env.name_buffer)
         } else {
             env.name.clone()
         };
-        let name_style = if app.env_renaming && selected {
+        let name_style = if app.env.renaming && selected {
             Style::default().fg(TEAL)
         } else if selected {
             Style::default().fg(FG)
@@ -368,9 +368,9 @@ pub(super) fn draw_assertions_popup(frame: &mut Frame, app: &App) {
 
     frame.render_widget(Clear, popup_area);
 
-    let passed = app.assertion_results.iter().filter(|r| r.passed).count();
-    let total = app.assertions.len();
-    let title = if app.assertion_results.is_empty() {
+    let passed = app.assertions.results.iter().filter(|r| r.passed).count();
+    let total = app.assertions.exprs.len();
+    let title = if app.assertions.results.is_empty() {
         format!(" Assertions ({total}) ")
     } else {
         format!(" Assertions ({passed}/{total} passed) ")
@@ -386,7 +386,7 @@ pub(super) fn draw_assertions_popup(frame: &mut Frame, app: &App) {
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
-    if app.assertion_editing {
+    if app.assertions.editing {
         let lines = vec![
             Line::default(),
             Line::from(Span::styled(
@@ -413,7 +413,7 @@ pub(super) fn draw_assertions_popup(frame: &mut Frame, app: &App) {
             Line::from(vec![
                 Span::styled("  > ", Style::default().fg(GREEN)),
                 Span::styled(
-                    format!("{}\u{2588}", &app.assertion_edit_buffer),
+                    format!("{}\u{2588}", &app.assertions.edit_buffer),
                     Style::default().fg(FG),
                 ),
             ]),
@@ -428,7 +428,7 @@ pub(super) fn draw_assertions_popup(frame: &mut Frame, app: &App) {
     }
 
     let mut y_pos = inner.y;
-    if app.assertions.is_empty() {
+    if app.assertions.exprs.is_empty() {
         frame.render_widget(
             Paragraph::new(Line::from(Span::styled(
                 "  No assertions. Press a to add one.",
@@ -437,16 +437,16 @@ pub(super) fn draw_assertions_popup(frame: &mut Frame, app: &App) {
             Rect::new(inner.x, y_pos, inner.width, 1),
         );
     } else {
-        for (i, expr) in app.assertions.iter().enumerate() {
+        for (i, expr) in app.assertions.exprs.iter().enumerate() {
             if y_pos >= inner.y + inner.height - 2 {
                 break;
             }
             let row = Rect::new(inner.x, y_pos, inner.width, 1);
-            let selected = i == app.assertions_selected;
+            let selected = i == app.assertions.selected;
             if selected {
                 frame.render_widget(Paragraph::new("").bg(SURFACE), row);
             }
-            let result = app.assertion_results.get(i);
+            let result = app.assertions.results.get(i);
             let (icon, icon_color, detail) = match result {
                 Some(r) if r.passed => ("\u{2713}", GREEN, r.message.clone()),
                 Some(r) => ("\u{2717}", RED, r.message.clone()),
@@ -490,7 +490,7 @@ pub(super) fn draw_extractors_popup(frame: &mut Frame, app: &App) {
 
     let title = format!(
         " Response extractors ({}) ",
-        app.extractor_editor.entries.len()
+        app.extractors.editor.entries.len()
     );
     let block = Block::default()
         .title(title)
@@ -502,7 +502,7 @@ pub(super) fn draw_extractors_popup(frame: &mut Frame, app: &App) {
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
-    if app.extractor_editor.editing {
+    if app.extractors.editor.editing {
         let lines = vec![
             Line::default(),
             Line::from(Span::styled(
@@ -512,12 +512,12 @@ pub(super) fn draw_extractors_popup(frame: &mut Frame, app: &App) {
             Line::from(vec![
                 Span::raw("  "),
                 Span::styled(
-                    if app.extractor_editor.edit_field == 0 {
-                        format!("{}\u{2588}", app.extractor_editor.edit_key_buf)
+                    if app.extractors.editor.edit_field == 0 {
+                        format!("{}\u{2588}", app.extractors.editor.edit_key_buf)
                     } else {
-                        app.extractor_editor.edit_key_buf.clone()
+                        app.extractors.editor.edit_key_buf.clone()
                     },
-                    Style::default().fg(if app.extractor_editor.edit_field == 0 {
+                    Style::default().fg(if app.extractors.editor.edit_field == 0 {
                         GREEN
                     } else {
                         FG
@@ -532,12 +532,12 @@ pub(super) fn draw_extractors_popup(frame: &mut Frame, app: &App) {
             Line::from(vec![
                 Span::raw("  "),
                 Span::styled(
-                    if app.extractor_editor.edit_field == 1 {
-                        format!("{}\u{2588}", app.extractor_editor.edit_value_buf)
+                    if app.extractors.editor.edit_field == 1 {
+                        format!("{}\u{2588}", app.extractors.editor.edit_value_buf)
                     } else {
-                        app.extractor_editor.edit_value_buf.clone()
+                        app.extractors.editor.edit_value_buf.clone()
                     },
-                    Style::default().fg(if app.extractor_editor.edit_field == 1 {
+                    Style::default().fg(if app.extractors.editor.edit_field == 1 {
                         GREEN
                     } else {
                         FG
@@ -555,7 +555,7 @@ pub(super) fn draw_extractors_popup(frame: &mut Frame, app: &App) {
     }
 
     let mut y_pos = inner.y;
-    if app.extractor_editor.entries.is_empty() {
+    if app.extractors.editor.entries.is_empty() {
         frame.render_widget(
             Paragraph::new(Line::from(Span::styled(
                 "  No extractors. Press a to add one.",
@@ -564,16 +564,21 @@ pub(super) fn draw_extractors_popup(frame: &mut Frame, app: &App) {
             Rect::new(inner.x, y_pos, inner.width, 1),
         );
     } else {
-        for (i, (name, path)) in app.extractor_editor.entries.iter().enumerate() {
+        for (i, (name, path)) in app.extractors.editor.entries.iter().enumerate() {
             if y_pos >= inner.y + inner.height - 2 {
                 break;
             }
             let row = Rect::new(inner.x, y_pos, inner.width, 1);
-            let selected = i == app.extractor_editor.selected;
+            let selected = i == app.extractors.editor.selected;
             if selected {
                 frame.render_widget(Paragraph::new("").bg(SURFACE), row);
             }
-            let preview = app.extracted_vars.get(name).cloned().unwrap_or_default();
+            let preview = app
+                .extractors
+                .extracted
+                .get(name)
+                .cloned()
+                .unwrap_or_default();
             let line = Line::from(vec![
                 Span::styled(
                     if selected { " > " } else { "   " },
@@ -610,7 +615,7 @@ pub(super) fn draw_cookies_popup(frame: &mut Frame, app: &App) {
 
     frame.render_widget(Clear, popup_area);
 
-    let title = format!(" Cookies ({}) ", app.cookie_store.cookies.len());
+    let title = format!(" Cookies ({}) ", app.cookies.store.cookies.len());
     let block = Block::default()
         .title(title)
         .title_style(Style::default().fg(TEAL).bold())
@@ -621,7 +626,7 @@ pub(super) fn draw_cookies_popup(frame: &mut Frame, app: &App) {
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
-    if app.cookie_store.cookies.is_empty() {
+    if app.cookies.store.cookies.is_empty() {
         frame.render_widget(
             Paragraph::new(Line::from(Span::styled(
                 "  No cookies stored. They will be captured automatically from Set-Cookie headers.",
@@ -633,14 +638,16 @@ pub(super) fn draw_cookies_popup(frame: &mut Frame, app: &App) {
     }
 
     let visible_rows = inner.height.saturating_sub(2) as usize;
-    let total = app.cookie_store.cookies.len();
+    let total = app.cookies.store.cookies.len();
     let start = app
-        .cookies_popup_selected
+        .cookies
+        .popup_selected
         .saturating_sub(visible_rows.saturating_sub(1));
 
     let mut y_pos = inner.y;
     for (i, cookie) in app
-        .cookie_store
+        .cookies
+        .store
         .cookies
         .iter()
         .enumerate()
@@ -648,7 +655,7 @@ pub(super) fn draw_cookies_popup(frame: &mut Frame, app: &App) {
         .take(visible_rows)
     {
         let row = Rect::new(inner.x, y_pos, inner.width, 1);
-        let selected = i == app.cookies_popup_selected;
+        let selected = i == app.cookies.popup_selected;
         if selected {
             frame.render_widget(Paragraph::new("").bg(SURFACE), row);
         }
@@ -685,7 +692,7 @@ pub(super) fn draw_cookies_popup(frame: &mut Frame, app: &App) {
         Paragraph::new(Line::from(Span::styled(
             format!(
                 "  {}/{}  j/k:nav  d:delete  D:clear all  Esc:close",
-                app.cookies_popup_selected + 1,
+                app.cookies.popup_selected + 1,
                 total,
             ),
             Style::default().fg(MUTED),
@@ -714,32 +721,32 @@ pub(super) fn draw_tls_popup(frame: &mut Frame, app: &App) {
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
-    let min_label = if app.tls_min_version.is_empty() {
+    let min_label = if app.tls.min_version.is_empty() {
         "auto".to_owned()
     } else {
-        format!("TLS {}", app.tls_min_version)
+        format!("TLS {}", app.tls.min_version)
     };
 
     let fields: [(&str, String); 5] = [
         (
             "Verify TLS",
-            if app.verify_tls {
+            if app.tls.verify {
                 "on"
             } else {
                 "off (insecure)"
             }
             .to_owned(),
         ),
-        ("CA cert", display_or_none(&app.ca_cert_path)),
-        ("Client cert", display_or_none(&app.client_cert_path)),
-        ("Client key", display_or_none(&app.client_key_path)),
+        ("CA cert", display_or_none(&app.tls.ca_cert)),
+        ("Client cert", display_or_none(&app.tls.client_cert)),
+        ("Client key", display_or_none(&app.tls.client_key)),
         ("Min TLS version", min_label),
     ];
 
     let mut lines: Vec<Line> = Vec::new();
     lines.push(Line::default());
     for (i, (label, value)) in fields.iter().enumerate() {
-        let selected = i == app.tls_popup_selected;
+        let selected = i == app.tls.popup_selected;
         let marker = if selected { " > " } else { "   " };
         let value_style = if selected {
             Style::default().fg(FG)
@@ -754,11 +761,11 @@ pub(super) fn draw_tls_popup(frame: &mut Frame, app: &App) {
     }
 
     lines.push(Line::default());
-    if app.tls_editing {
+    if app.tls.editing {
         lines.push(Line::from(vec![
             Span::styled("   path: ", Style::default().fg(MUTED)),
             Span::styled(
-                format!("{}\u{2588}", &app.tls_edit_buffer),
+                format!("{}\u{2588}", &app.tls.edit_buffer),
                 Style::default().fg(GREEN),
             ),
         ]));
@@ -796,12 +803,12 @@ pub(super) fn draw_timeout_popup(frame: &mut Frame, app: &App) {
 
     frame.render_widget(Clear, popup_area);
 
-    let title = if app.timeout_error {
+    let title = if app.timeout.error {
         " Timeout (1-3600) "
     } else {
         " Request timeout "
     };
-    let color = if app.timeout_error { RED } else { TEAL };
+    let color = if app.timeout.error { RED } else { TEAL };
 
     let block = Block::default()
         .title(title)
@@ -813,7 +820,7 @@ pub(super) fn draw_timeout_popup(frame: &mut Frame, app: &App) {
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
-    let display = format!("{}\u{2588}", &app.timeout_buffer);
+    let display = format!("{}\u{2588}", &app.timeout.buffer);
     let lines = vec![
         Line::from(Span::styled("Seconds:", Style::default().fg(MUTED))),
         Line::default(),
@@ -838,12 +845,12 @@ pub(super) fn draw_env_import_popup(frame: &mut Frame, app: &App) {
 
     frame.render_widget(Clear, popup_area);
 
-    let title = if app.env_import_error {
+    let title = if app.env.import.error {
         " Import .env (invalid) "
     } else {
         " Import .env "
     };
-    let title_style = if app.env_import_error {
+    let title_style = if app.env.import.error {
         Style::default().fg(RED).bold()
     } else {
         Style::default().fg(TEAL).bold()
@@ -853,7 +860,7 @@ pub(super) fn draw_env_import_popup(frame: &mut Frame, app: &App) {
         .title(title)
         .title_style(title_style)
         .borders(Borders::ALL)
-        .border_style(if app.env_import_error {
+        .border_style(if app.env.import.error {
             Style::default().fg(RED)
         } else {
             Style::default().fg(TEAL)
@@ -863,7 +870,7 @@ pub(super) fn draw_env_import_popup(frame: &mut Frame, app: &App) {
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
-    let display = format!("{}\u{2588}", &app.env_import_buffer);
+    let display = format!("{}\u{2588}", &app.env.import.buffer);
     let lines = vec![
         Line::from(Span::styled(
             "Path to .env file:",
@@ -877,7 +884,11 @@ pub(super) fn draw_env_import_popup(frame: &mut Frame, app: &App) {
 }
 
 pub(super) fn draw_env_editor(frame: &mut Frame, app: &App) {
-    let env = app.environments.iter().find(|e| e.id == app.env_editor_id);
+    let env = app
+        .env
+        .environments
+        .iter()
+        .find(|e| e.id == app.env.editor.id);
     let env_name = env.map_or("?", |e| &e.name);
     let vars = env.map_or(&[][..], |e| &e.variables);
 
@@ -901,7 +912,7 @@ pub(super) fn draw_env_editor(frame: &mut Frame, app: &App) {
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
-    if app.env_editing_var {
+    if app.env.editor.editing_var {
         draw_env_var_edit(frame, app, inner);
         return;
     }
@@ -912,7 +923,7 @@ pub(super) fn draw_env_editor(frame: &mut Frame, app: &App) {
             break;
         }
         let row = Rect::new(inner.x, row_y, inner.width, 1);
-        let selected = i == app.env_editor_selected;
+        let selected = i == app.env.editor.selected;
 
         if selected {
             frame.render_widget(Paragraph::new("").bg(SURFACE), row);
@@ -948,7 +959,7 @@ pub(super) fn draw_env_editor(frame: &mut Frame, app: &App) {
     let add_y = inner.y + vars.len() as u16;
     if add_y < inner.y + inner.height {
         let row = Rect::new(inner.x, add_y, inner.width, 1);
-        let selected = app.env_editor_selected >= vars.len();
+        let selected = app.env.editor.selected >= vars.len();
 
         if selected {
             frame.render_widget(Paragraph::new("").bg(SURFACE), row);
@@ -985,26 +996,26 @@ fn draw_env_var_edit(frame: &mut Frame, app: &App, parent: Rect) {
     let edit_inner = edit_block.inner(edit_area);
     frame.render_widget(edit_block, edit_area);
 
-    let key_style = if app.env_var_field == 0 {
+    let key_style = if app.env.editor.var_field == 0 {
         Style::default().fg(GREEN)
     } else {
         Style::default().fg(FG)
     };
-    let val_style = if app.env_var_field == 1 {
+    let val_style = if app.env.editor.var_field == 1 {
         Style::default().fg(GREEN)
     } else {
         Style::default().fg(FG)
     };
 
-    let key_display = if app.env_var_field == 0 {
-        format!("{}\u{2588}", &app.env_var_key_buffer)
+    let key_display = if app.env.editor.var_field == 0 {
+        format!("{}\u{2588}", &app.env.editor.var_key_buffer)
     } else {
-        app.env_var_key_buffer.clone()
+        app.env.editor.var_key_buffer.clone()
     };
-    let val_display = if app.env_var_field == 1 {
-        format!("{}\u{2588}", &app.env_var_value_buffer)
+    let val_display = if app.env.editor.var_field == 1 {
+        format!("{}\u{2588}", &app.env.editor.var_value_buffer)
     } else {
-        app.env_var_value_buffer.clone()
+        app.env.editor.var_value_buffer.clone()
     };
 
     let lines = vec![

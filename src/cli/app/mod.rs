@@ -27,8 +27,9 @@ use crate::history::{self, HistoryEntry};
 use crate::postman;
 use crate::settings::{self, Settings};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum Method {
+    #[default]
     Get,
     Post,
     Put,
@@ -82,36 +83,40 @@ impl Method {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum View {
+    #[default]
     Main,
     Settings,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Focus {
+    #[default]
     Sidebar,
     UrlBar,
     Body,
     Response,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ResponseTab {
+    #[default]
     Body,
     Headers,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum RequestTab {
+    #[default]
     Body,
     Headers,
     Auth,
     Params,
 }
 
-#[allow(clippy::struct_excessive_bools)]
-pub struct App {
+#[derive(Default)]
+pub struct RequestState {
     pub method: Method,
     pub url: String,
     pub body: String,
@@ -119,106 +124,214 @@ pub struct App {
     pub cursor_pos: usize,
     pub body_row: usize,
     pub body_col: usize,
-    pub response: Option<Result<HttpResponse, String>>,
-    pub loading: bool,
-    pub view: View,
-    pub focus: Focus,
-    pub request_tab: RequestTab,
-    pub response_tab: ResponseTab,
-    pub response_scroll: u16,
-    pub folders: Vec<Folder>,
-    pub requests: Vec<SavedRequest>,
-    pub sidebar_selected: usize,
-    pub active_request_id: Option<String>,
     pub editing_url: bool,
     pub editing_body: bool,
-    pub settings: Settings,
-    pub settings_selected: usize,
-    pub method_popup: bool,
-    pub method_popup_selected: usize,
-    pub editing_sidebar_name: bool,
-    pub sidebar_edit_buffer: String,
-    pub history: Vec<HistoryEntry>,
-    pub history_open: bool,
-    pub history_selected: usize,
-    pub confirm_delete: bool,
-    pub curl_import_open: bool,
-    pub curl_import_buffer: String,
-    pub curl_import_error: bool,
-    pub curl_export_open: bool,
-    pub curl_export_content: String,
-    pub postman_import_open: bool,
-    pub postman_import_buffer: String,
-    pub postman_import_error: bool,
-    pub environments: Vec<Environment>,
-    pub active_env_id: Option<String>,
-    pub env_popup_open: bool,
-    pub env_popup_selected: usize,
-    pub env_editor_open: bool,
-    pub env_editor_id: String,
-    pub env_editor_selected: usize,
-    pub env_editing_var: bool,
-    pub env_var_key_buffer: String,
-    pub env_var_value_buffer: String,
-    pub env_var_field: usize,
-    pub env_renaming: bool,
-    pub env_name_buffer: String,
-    pub env_import_open: bool,
-    pub env_import_buffer: String,
-    pub env_import_error: bool,
+    pub tab: RequestTab,
     pub body_type: BodyType,
     pub content_type: ContentType,
     pub form_editor: KvEditorState,
     pub header_editor: KvEditorState,
     pub param_editor: KvEditorState,
-    pub auth: Auth,
-    pub auth_selecting_type: bool,
-    pub auth_type_selected: usize,
-    pub auth_editing: bool,
-    pub auth_field: usize,
-    pub auth_buf_a: String,
-    pub auth_buf_b: String,
-    pub response_search: String,
-    pub response_searching: bool,
-    pub response_search_buf: String,
-    pub response_match_idx: usize,
+}
+
+#[derive(Default)]
+pub struct SidebarState {
+    pub folders: Vec<Folder>,
+    pub requests: Vec<SavedRequest>,
+    pub selected: usize,
+    pub active_request_id: Option<String>,
+    pub editing_name: bool,
+    pub edit_buffer: String,
+    pub confirm_delete: bool,
+}
+
+#[derive(Default)]
+pub struct ResponseState {
+    pub last: Option<Result<HttpResponse, String>>,
+    pub tab: ResponseTab,
+    pub scroll: u16,
+    pub search: String,
+    pub searching: bool,
+    pub search_buf: String,
+    pub match_idx: usize,
+    pub loading: bool,
+    pub last_bodies: HashMap<String, String>,
     pub clipboard_msg: Option<String>,
+}
+
+#[derive(Default)]
+pub struct AuthState {
+    pub config: Auth,
+    pub selecting_type: bool,
+    pub type_selected: usize,
+    pub editing: bool,
+    pub field: usize,
+    pub buf_a: String,
+    pub buf_b: String,
+}
+
+#[derive(Default)]
+pub struct EnvState {
+    pub environments: Vec<Environment>,
+    pub active_id: Option<String>,
+    pub popup_open: bool,
+    pub popup_selected: usize,
+    pub renaming: bool,
+    pub name_buffer: String,
+    pub editor: EnvEditorState,
+    pub import: EnvImportState,
+}
+
+#[derive(Default)]
+pub struct EnvEditorState {
+    pub open: bool,
+    pub id: String,
+    pub selected: usize,
+    pub editing_var: bool,
+    pub var_key_buffer: String,
+    pub var_value_buffer: String,
+    pub var_field: usize,
+}
+
+#[derive(Default)]
+pub struct EnvImportState {
+    pub open: bool,
+    pub buffer: String,
+    pub error: bool,
+}
+
+#[derive(Default)]
+pub struct HistoryState {
+    pub entries: Vec<HistoryEntry>,
+    pub open: bool,
+    pub selected: usize,
+}
+
+#[derive(Default)]
+pub struct CurlIoState {
+    pub import_open: bool,
+    pub import_buffer: String,
+    pub import_error: bool,
+    pub export_open: bool,
+    pub export_content: String,
+}
+
+#[derive(Default)]
+pub struct PostmanIoState {
+    pub open: bool,
+    pub buffer: String,
+    pub error: bool,
+}
+
+#[derive(Default)]
+pub struct MethodPopupState {
+    pub open: bool,
+    pub selected: usize,
+}
+
+pub struct TimeoutState {
+    pub secs: u64,
+    pub popup_open: bool,
+    pub buffer: String,
+    pub error: bool,
+}
+
+impl Default for TimeoutState {
+    fn default() -> Self {
+        Self {
+            secs: collections::default_timeout(),
+            popup_open: false,
+            buffer: String::new(),
+            error: false,
+        }
+    }
+}
+
+pub struct TlsState {
+    pub verify: bool,
+    pub ca_cert: String,
+    pub client_cert: String,
+    pub client_key: String,
+    pub min_version: String,
+    pub popup_open: bool,
+    pub popup_selected: usize,
+    pub editing: bool,
+    pub edit_buffer: String,
+}
+
+impl Default for TlsState {
+    fn default() -> Self {
+        Self {
+            verify: true,
+            ca_cert: String::new(),
+            client_cert: String::new(),
+            client_key: String::new(),
+            min_version: String::new(),
+            popup_open: false,
+            popup_selected: 0,
+            editing: false,
+            edit_buffer: String::new(),
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct CookiesState {
+    pub store: CookieStore,
+    pub popup_open: bool,
+    pub popup_selected: usize,
+}
+
+#[derive(Default)]
+pub struct ExtractorsState {
+    pub editor: KvEditorState,
+    pub popup_open: bool,
+    pub extracted: HashMap<String, String>,
+}
+
+#[derive(Default)]
+pub struct AssertionsState {
+    pub exprs: Vec<String>,
+    pub results: Vec<AssertionResult>,
+    pub popup_open: bool,
+    pub selected: usize,
+    pub editing: bool,
+    pub edit_buffer: String,
+    pub editing_existing: bool,
+}
+
+#[derive(Default)]
+pub struct SettingsView {
+    pub view: View,
+    pub settings: Settings,
+    pub settings_selected: usize,
+    pub focus: Focus,
+}
+
+#[derive(Default)]
+pub struct App {
+    pub request: RequestState,
+    pub sidebar: SidebarState,
+    pub response: ResponseState,
+    pub auth: AuthState,
+    pub env: EnvState,
+    pub history: HistoryState,
+    pub curl_io: CurlIoState,
+    pub postman_io: PostmanIoState,
+    pub method_popup: MethodPopupState,
+    pub timeout: TimeoutState,
+    pub tls: TlsState,
+    pub cookies: CookiesState,
+    pub extractors: ExtractorsState,
+    pub assertions: AssertionsState,
+    pub ui: SettingsView,
     pub follow_redirects: bool,
-    pub timeout_secs: u64,
-    pub timeout_popup_open: bool,
-    pub timeout_buffer: String,
-    pub timeout_error: bool,
-    pub verify_tls: bool,
-    pub ca_cert_path: String,
-    pub client_cert_path: String,
-    pub client_key_path: String,
-    pub tls_min_version: String,
-    pub tls_popup_open: bool,
-    pub tls_popup_selected: usize,
-    pub tls_editing: bool,
-    pub tls_edit_buffer: String,
-    pub extractor_editor: KvEditorState,
-    pub extractors_popup_open: bool,
-    pub extracted_vars: HashMap<String, String>,
-    pub assertions: Vec<String>,
-    pub assertion_results: Vec<AssertionResult>,
-    pub assertions_popup_open: bool,
-    pub assertions_selected: usize,
-    pub assertion_editing: bool,
-    pub assertion_edit_buffer: String,
-    pub assertion_editing_existing: bool,
-    pub last_responses: HashMap<String, String>,
-    pub cookie_store: CookieStore,
-    pub cookies_popup_open: bool,
-    pub cookies_popup_selected: usize,
     pending: Option<PendingRequest>,
 }
 
 impl App {
-    #[allow(clippy::too_many_lines)]
     pub fn new() -> Self {
         let settings = settings::load();
-        let hist = history::load();
         let data = collections::load();
         let env_data = environments::load();
 
@@ -235,114 +348,39 @@ impl App {
         };
 
         let mut app = Self {
-            method: Method::Get,
-            url: String::new(),
-            body: String::new(),
-            headers: HashMap::new(),
-            cursor_pos: 0,
-            body_row: 0,
-            body_col: 0,
-            response: None,
-            loading: false,
-            view: View::Main,
-            focus: Focus::Sidebar,
-            request_tab: RequestTab::Body,
-            response_tab: ResponseTab::Body,
-            response_scroll: 0,
-            folders,
-            requests,
-            sidebar_selected: 0,
-            active_request_id: active_id,
-            editing_url: false,
-            editing_body: false,
-            settings,
-            settings_selected: 0,
-            method_popup: false,
-            method_popup_selected: 0,
-            editing_sidebar_name: false,
-            sidebar_edit_buffer: String::new(),
-            history: hist,
-            history_open: false,
-            history_selected: 0,
-            confirm_delete: false,
-            curl_import_open: false,
-            curl_import_buffer: String::new(),
-            curl_import_error: false,
-            curl_export_open: false,
-            curl_export_content: String::new(),
-            postman_import_open: false,
-            postman_import_buffer: String::new(),
-            postman_import_error: false,
-            environments: env_data.environments,
-            active_env_id: env_data.active_id,
-            env_popup_open: false,
-            env_popup_selected: 0,
-            env_editor_open: false,
-            env_editor_id: String::new(),
-            env_editor_selected: 0,
-            env_editing_var: false,
-            env_var_key_buffer: String::new(),
-            env_var_value_buffer: String::new(),
-            env_var_field: 0,
-            env_renaming: false,
-            env_name_buffer: String::new(),
-            env_import_open: false,
-            env_import_buffer: String::new(),
-            env_import_error: false,
-            body_type: BodyType::Raw,
-            content_type: ContentType::Json,
-            form_editor: KvEditorState::default(),
-            header_editor: KvEditorState::default(),
-            param_editor: KvEditorState::default(),
-            auth: Auth::None,
-            auth_selecting_type: false,
-            auth_type_selected: 0,
-            auth_editing: false,
-            auth_field: 0,
-            auth_buf_a: String::new(),
-            auth_buf_b: String::new(),
-            response_search: String::new(),
-            response_searching: false,
-            response_search_buf: String::new(),
-            response_match_idx: 0,
-            clipboard_msg: None,
+            sidebar: SidebarState {
+                folders,
+                requests,
+                active_request_id: active_id,
+                ..Default::default()
+            },
+            env: EnvState {
+                environments: env_data.environments,
+                active_id: env_data.active_id,
+                ..Default::default()
+            },
+            history: HistoryState {
+                entries: history::load(),
+                ..Default::default()
+            },
+            cookies: CookiesState {
+                store: cookies::load(),
+                ..Default::default()
+            },
+            ui: SettingsView {
+                settings,
+                ..Default::default()
+            },
             follow_redirects: true,
-            timeout_secs: collections::default_timeout(),
-            timeout_popup_open: false,
-            timeout_buffer: String::new(),
-            timeout_error: false,
-            verify_tls: true,
-            ca_cert_path: String::new(),
-            client_cert_path: String::new(),
-            client_key_path: String::new(),
-            tls_min_version: String::new(),
-            tls_popup_open: false,
-            tls_popup_selected: 0,
-            tls_editing: false,
-            tls_edit_buffer: String::new(),
-            extractor_editor: KvEditorState::default(),
-            extractors_popup_open: false,
-            extracted_vars: HashMap::new(),
-            assertions: Vec::new(),
-            assertion_results: Vec::new(),
-            assertions_popup_open: false,
-            assertions_selected: 0,
-            assertion_editing: false,
-            assertion_edit_buffer: String::new(),
-            assertion_editing_existing: false,
-            last_responses: HashMap::new(),
-            cookie_store: cookies::load(),
-            cookies_popup_open: false,
-            cookies_popup_selected: 0,
-            pending: None,
+            ..Self::default()
         };
 
-        if let Some(id) = &app.active_request_id.clone() {
-            if let Some(idx) = app.requests.iter().position(|r| &r.id == id) {
-                app.sidebar_selected = idx;
-                app.load_request_by_id(id);
+        if let Some(id) = app.sidebar.active_request_id.clone() {
+            if let Some(idx) = app.sidebar.requests.iter().position(|r| r.id == id) {
+                app.sidebar.selected = idx;
+                app.load_request_by_id(&id);
             }
-        } else if !app.requests.is_empty() {
+        } else if !app.sidebar.requests.is_empty() {
             app.load_request_at(0);
         }
 
@@ -351,9 +389,9 @@ impl App {
 
     pub fn save_collections(&self) {
         let data = CollectionData {
-            folders: self.folders.clone(),
-            requests: self.requests.clone(),
-            active_request_id: self.active_request_id.clone(),
+            folders: self.sidebar.folders.clone(),
+            requests: self.sidebar.requests.clone(),
+            active_request_id: self.sidebar.active_request_id.clone(),
         };
         collections::save(&data);
     }
@@ -362,10 +400,10 @@ impl App {
     pub fn sidebar_items(&self) -> Vec<SidebarItem> {
         let mut items = Vec::new();
 
-        for folder in &self.folders {
+        for folder in &self.sidebar.folders {
             items.push(SidebarItem::Folder(folder.clone()));
             if folder.expanded {
-                for req in &self.requests {
+                for req in &self.sidebar.requests {
                     if req.folder_id.as_deref() == Some(&folder.id) {
                         items.push(SidebarItem::Request(Box::new(req.clone())));
                     }
@@ -373,7 +411,7 @@ impl App {
             }
         }
 
-        for req in &self.requests {
+        for req in &self.sidebar.requests {
             if req.folder_id.is_none() {
                 items.push(SidebarItem::Request(Box::new(req.clone())));
             }
@@ -388,33 +426,33 @@ impl App {
 
     pub fn settings_items(&self) -> Vec<(&str, bool)> {
         vec![
-            ("Splash animation", self.settings.splash_animation),
-            ("Vim keys", self.settings.vim_keys),
+            ("Splash animation", self.ui.settings.splash_animation),
+            ("Vim keys", self.ui.settings.vim_keys),
         ]
     }
 
     pub fn toggle_setting(&mut self) {
-        match self.settings_selected {
-            0 => self.settings.splash_animation = !self.settings.splash_animation,
-            1 => self.settings.vim_keys = !self.settings.vim_keys,
+        match self.ui.settings_selected {
+            0 => self.ui.settings.splash_animation = !self.ui.settings.splash_animation,
+            1 => self.ui.settings.vim_keys = !self.ui.settings.vim_keys,
             _ => {}
         }
-        settings::save(&self.settings);
+        settings::save(&self.ui.settings);
     }
 
     // -- Method popup --
 
     pub fn open_method_popup(&mut self) {
-        self.method_popup_selected = Method::all()
+        self.method_popup.selected = Method::all()
             .iter()
-            .position(|m| m == &self.method)
+            .position(|m| m == &self.request.method)
             .unwrap_or(0);
-        self.method_popup = true;
+        self.method_popup.open = true;
     }
 
     pub fn confirm_method_popup(&mut self) {
-        self.method = Method::all()[self.method_popup_selected].clone();
-        self.method_popup = false;
+        self.request.method = Method::all()[self.method_popup.selected].clone();
+        self.method_popup.open = false;
         self.sync_to_collection();
     }
 
@@ -425,12 +463,12 @@ impl App {
     }
 
     pub fn selected_sidebar_item(&self) -> Option<SidebarItem> {
-        self.sidebar_items().get(self.sidebar_selected).cloned()
+        self.sidebar_items().get(self.sidebar.selected).cloned()
     }
 
     pub fn toggle_folder_at_cursor(&mut self) {
         if let Some(SidebarItem::Folder(f)) = self.selected_sidebar_item() {
-            if let Some(folder) = self.folders.iter_mut().find(|fo| fo.id == f.id) {
+            if let Some(folder) = self.sidebar.folders.iter_mut().find(|fo| fo.id == f.id) {
                 folder.expanded = !folder.expanded;
             }
             self.save_collections();
@@ -447,50 +485,51 @@ impl App {
     }
 
     fn load_request_by_id(&mut self, id: &str) {
-        if let Some(req) = self.requests.iter().find(|r| r.id == id) {
-            self.method = Method::from_str(&req.method);
-            self.url = req.url.clone();
-            self.body = req.body.clone();
-            self.headers = req.headers.clone();
-            self.auth = req.auth.clone();
-            self.body_type = req.body_type;
-            self.content_type = req.content_type;
-            self.form_editor.entries = req.form_data.clone();
+        if let Some(req) = self.sidebar.requests.iter().find(|r| r.id == id) {
+            self.request.method = Method::from_str(&req.method);
+            self.request.url = req.url.clone();
+            self.request.body = req.body.clone();
+            self.request.headers = req.headers.clone();
+            self.auth.config = req.auth.clone();
+            self.request.body_type = req.body_type;
+            self.request.content_type = req.content_type;
+            self.request.form_editor.entries = req.form_data.clone();
             self.follow_redirects = req.follow_redirects;
-            self.timeout_secs = req.timeout_secs;
-            self.verify_tls = req.verify_tls;
-            self.ca_cert_path.clone_from(&req.ca_cert_path);
-            self.client_cert_path.clone_from(&req.client_cert_path);
-            self.client_key_path.clone_from(&req.client_key_path);
-            self.tls_min_version.clone_from(&req.tls_min_version);
-            self.extractor_editor.entries.clone_from(&req.extractors);
-            self.extractor_editor.selected = 0;
-            self.extractor_editor.editing = false;
-            self.assertions.clone_from(&req.assertions);
-            self.assertion_results
+            self.timeout.secs = req.timeout_secs;
+            self.tls.verify = req.verify_tls;
+            self.tls.ca_cert.clone_from(&req.ca_cert_path);
+            self.tls.client_cert.clone_from(&req.client_cert_path);
+            self.tls.client_key.clone_from(&req.client_key_path);
+            self.tls.min_version.clone_from(&req.tls_min_version);
+            self.extractors.editor.entries.clone_from(&req.extractors);
+            self.extractors.editor.selected = 0;
+            self.extractors.editor.editing = false;
+            self.assertions.exprs.clone_from(&req.assertions);
+            self.assertions
+                .results
                 .clone_from(&req.last_assertion_results);
-            self.assertions_selected = 0;
-            self.response = match (&req.last_response, &req.last_error) {
+            self.assertions.selected = 0;
+            self.response.last = match (&req.last_response, &req.last_error) {
                 (Some(r), _) => Some(Ok(r.clone())),
                 (None, Some(e)) => Some(Err(e.clone())),
                 _ => None,
             };
-            self.form_editor.selected = 0;
-            self.form_editor.editing = false;
-            self.cursor_pos = self.url.len();
-            self.body_row = 0;
-            self.body_col = 0;
-            self.response_scroll = 0;
-            self.active_request_id = Some(id.to_owned());
+            self.request.form_editor.selected = 0;
+            self.request.form_editor.editing = false;
+            self.request.cursor_pos = self.request.url.len();
+            self.request.body_row = 0;
+            self.request.body_col = 0;
+            self.response.scroll = 0;
+            self.sidebar.active_request_id = Some(id.to_owned());
             self.sync_headers_from_map();
             self.parse_params_from_url();
-            self.request_tab = RequestTab::Body;
+            self.request.tab = RequestTab::Body;
             self.save_collections();
         }
     }
 
     fn load_request_at(&mut self, idx: usize) {
-        if let Some(req) = self.requests.get(idx) {
+        if let Some(req) = self.sidebar.requests.get(idx) {
             let id = req.id.clone();
             self.load_request_by_id(&id);
         }
@@ -499,45 +538,47 @@ impl App {
     /// Syncs current editor state back to the collection.
     pub fn sync_to_collection(&mut self) {
         self.sync_headers_to_map();
-        let Some(id) = self.active_request_id.clone() else {
+        let Some(id) = self.sidebar.active_request_id.clone() else {
             return;
         };
-        if let Some(req) = self.requests.iter_mut().find(|r| r.id == id) {
-            self.method.as_str().clone_into(&mut req.method);
-            req.url.clone_from(&self.url);
-            req.body.clone_from(&self.body);
-            req.headers.clone_from(&self.headers);
-            req.auth.clone_from(&self.auth);
-            req.body_type = self.body_type;
-            req.content_type = self.content_type;
-            req.form_data.clone_from(&self.form_editor.entries);
+        if let Some(req) = self.sidebar.requests.iter_mut().find(|r| r.id == id) {
+            self.request.method.as_str().clone_into(&mut req.method);
+            req.url.clone_from(&self.request.url);
+            req.body.clone_from(&self.request.body);
+            req.headers.clone_from(&self.request.headers);
+            req.auth.clone_from(&self.auth.config);
+            req.body_type = self.request.body_type;
+            req.content_type = self.request.content_type;
+            req.form_data.clone_from(&self.request.form_editor.entries);
             req.follow_redirects = self.follow_redirects;
-            req.timeout_secs = self.timeout_secs;
-            req.verify_tls = self.verify_tls;
-            req.ca_cert_path.clone_from(&self.ca_cert_path);
-            req.client_cert_path.clone_from(&self.client_cert_path);
-            req.client_key_path.clone_from(&self.client_key_path);
-            req.tls_min_version.clone_from(&self.tls_min_version);
-            req.extractors.clone_from(&self.extractor_editor.entries);
-            req.assertions.clone_from(&self.assertions);
+            req.timeout_secs = self.timeout.secs;
+            req.verify_tls = self.tls.verify;
+            req.ca_cert_path.clone_from(&self.tls.ca_cert);
+            req.client_cert_path.clone_from(&self.tls.client_cert);
+            req.client_key_path.clone_from(&self.tls.client_key);
+            req.tls_min_version.clone_from(&self.tls.min_version);
+            req.extractors.clone_from(&self.extractors.editor.entries);
+            req.assertions.clone_from(&self.assertions.exprs);
         }
         self.save_collections();
     }
 
     fn sync_headers_from_map(&mut self) {
         let mut entries: Vec<(String, String)> = self
+            .request
             .headers
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
         entries.sort_by(|a, b| a.0.cmp(&b.0));
-        self.header_editor.entries = entries;
-        self.header_editor.selected = 0;
-        self.header_editor.editing = false;
+        self.request.header_editor.entries = entries;
+        self.request.header_editor.selected = 0;
+        self.request.header_editor.editing = false;
     }
 
     fn sync_headers_to_map(&mut self) {
-        self.headers = self
+        self.request.headers = self
+            .request
             .header_editor
             .entries
             .iter()
@@ -546,12 +587,12 @@ impl App {
     }
 
     pub fn parse_params_from_url(&mut self) {
-        self.param_editor.entries.clear();
-        let Some(query_start) = self.url.find('?') else {
-            self.param_editor.selected = 0;
+        self.request.param_editor.entries.clear();
+        let Some(query_start) = self.request.url.find('?') else {
+            self.request.param_editor.selected = 0;
             return;
         };
-        let query = &self.url[query_start + 1..];
+        let query = &self.request.url[query_start + 1..];
         let query = query.split('#').next().unwrap_or(query);
         for pair in query.split('&') {
             if pair.is_empty() {
@@ -564,17 +605,24 @@ impl App {
                 ),
                 None => (url_utils::simple_url_decode(pair), String::new()),
             };
-            self.param_editor.entries.push((key, value));
+            self.request.param_editor.entries.push((key, value));
         }
-        self.param_editor.selected = 0;
+        self.request.param_editor.selected = 0;
     }
 
     pub fn sync_params_to_url(&mut self) {
-        let base = self.url.split('?').next().unwrap_or(&self.url).to_owned();
-        if self.param_editor.entries.is_empty() {
-            self.url = base;
+        let base = self
+            .request
+            .url
+            .split('?')
+            .next()
+            .unwrap_or(&self.request.url)
+            .to_owned();
+        if self.request.param_editor.entries.is_empty() {
+            self.request.url = base;
         } else {
             let query: String = self
+                .request
                 .param_editor
                 .entries
                 .iter()
@@ -587,9 +635,9 @@ impl App {
                 })
                 .collect::<Vec<_>>()
                 .join("&");
-            self.url = format!("{base}?{query}");
+            self.request.url = format!("{base}?{query}");
         }
-        self.cursor_pos = self.url.len();
+        self.request.cursor_pos = self.request.url.len();
         self.sync_to_collection();
     }
 
@@ -598,12 +646,12 @@ impl App {
     pub fn start_editing_name(&mut self) {
         match self.selected_sidebar_item() {
             Some(SidebarItem::Request(req)) => {
-                self.sidebar_edit_buffer = req.name;
-                self.editing_sidebar_name = true;
+                self.sidebar.edit_buffer = req.name;
+                self.sidebar.editing_name = true;
             }
             Some(SidebarItem::Folder(f)) => {
-                self.sidebar_edit_buffer = f.name;
-                self.editing_sidebar_name = true;
+                self.sidebar.edit_buffer = f.name;
+                self.sidebar.editing_name = true;
             }
             Some(SidebarItem::NewRequest) | None => {}
         }
@@ -612,28 +660,28 @@ impl App {
     pub fn confirm_editing_name(&mut self) {
         match self.selected_sidebar_item() {
             Some(SidebarItem::Request(req)) => {
-                if let Some(r) = self.requests.iter_mut().find(|r| r.id == req.id) {
-                    r.name.clone_from(&self.sidebar_edit_buffer);
+                if let Some(r) = self.sidebar.requests.iter_mut().find(|r| r.id == req.id) {
+                    r.name.clone_from(&self.sidebar.edit_buffer);
                 }
             }
             Some(SidebarItem::Folder(f)) => {
-                if let Some(fo) = self.folders.iter_mut().find(|fo| fo.id == f.id) {
-                    fo.name.clone_from(&self.sidebar_edit_buffer);
+                if let Some(fo) = self.sidebar.folders.iter_mut().find(|fo| fo.id == f.id) {
+                    fo.name.clone_from(&self.sidebar.edit_buffer);
                 }
             }
             Some(SidebarItem::NewRequest) | None => {}
         }
-        self.editing_sidebar_name = false;
+        self.sidebar.editing_name = false;
         self.save_collections();
     }
 
     pub fn cycle_sidebar_method(&mut self) {
         if let Some(SidebarItem::Request(req)) = self.selected_sidebar_item() {
-            if let Some(r) = self.requests.iter_mut().find(|r| r.id == req.id) {
+            if let Some(r) = self.sidebar.requests.iter_mut().find(|r| r.id == req.id) {
                 let m = Method::from_str(&r.method).next();
                 m.as_str().clone_into(&mut r.method);
-                if self.active_request_id.as_deref() == Some(&req.id) {
-                    self.method = Method::from_str(&r.method);
+                if self.sidebar.active_request_id.as_deref() == Some(&req.id) {
+                    self.request.method = Method::from_str(&r.method);
                 }
             }
             self.save_collections();
@@ -683,7 +731,7 @@ impl App {
         };
 
         let id = req.id.clone();
-        self.requests.push(req);
+        self.sidebar.requests.push(req);
         self.save_collections();
         self.load_request_by_id(&id);
 
@@ -692,10 +740,10 @@ impl App {
             .iter()
             .position(|item| matches!(item, SidebarItem::Request(r) if r.id == id))
         {
-            self.sidebar_selected = idx;
+            self.sidebar.selected = idx;
         }
 
-        self.focus = Focus::UrlBar;
+        self.ui.focus = Focus::UrlBar;
     }
 
     pub fn create_folder(&mut self) {
@@ -704,11 +752,11 @@ impl App {
             name: "New Folder".into(),
             expanded: true,
         };
-        self.folders.push(folder);
+        self.sidebar.folders.push(folder);
         self.save_collections();
 
         let items = self.sidebar_items();
-        self.sidebar_selected = items.len().saturating_sub(1);
+        self.sidebar.selected = items.len().saturating_sub(1);
     }
 
     pub fn duplicate_request(&mut self) {
@@ -739,7 +787,7 @@ impl App {
                 last_assertion_results: req.last_assertion_results,
             };
             let id = new_req.id.clone();
-            self.requests.push(new_req);
+            self.sidebar.requests.push(new_req);
             self.save_collections();
             self.load_request_by_id(&id);
 
@@ -748,50 +796,51 @@ impl App {
                 .iter()
                 .position(|item| matches!(item, SidebarItem::Request(r) if r.id == id))
             {
-                self.sidebar_selected = idx;
+                self.sidebar.selected = idx;
             }
         }
     }
 
     pub fn request_delete(&mut self) {
-        if self.confirm_delete {
+        if self.sidebar.confirm_delete {
             self.confirm_delete_action();
         } else {
-            self.confirm_delete = true;
+            self.sidebar.confirm_delete = true;
         }
     }
 
     pub const fn cancel_delete(&mut self) {
-        self.confirm_delete = false;
+        self.sidebar.confirm_delete = false;
     }
 
     fn confirm_delete_action(&mut self) {
-        self.confirm_delete = false;
+        self.sidebar.confirm_delete = false;
         match self.selected_sidebar_item() {
             Some(SidebarItem::Request(req)) => {
-                self.requests.retain(|r| r.id != req.id);
-                if self.active_request_id.as_deref() == Some(&req.id) {
-                    self.active_request_id = None;
-                    self.url.clear();
-                    self.body.clear();
-                    self.response = None;
+                self.sidebar.requests.retain(|r| r.id != req.id);
+                if self.sidebar.active_request_id.as_deref() == Some(&req.id) {
+                    self.sidebar.active_request_id = None;
+                    self.request.url.clear();
+                    self.request.body.clear();
+                    self.response.last = None;
                 }
             }
             Some(SidebarItem::Folder(f)) => {
-                self.requests
+                self.sidebar
+                    .requests
                     .retain(|r| r.folder_id.as_deref() != Some(&f.id));
-                self.folders.retain(|fo| fo.id != f.id);
-                self.active_request_id = None;
-                self.url.clear();
-                self.body.clear();
-                self.response = None;
+                self.sidebar.folders.retain(|fo| fo.id != f.id);
+                self.sidebar.active_request_id = None;
+                self.request.url.clear();
+                self.request.body.clear();
+                self.response.last = None;
             }
             Some(SidebarItem::NewRequest) | None => return,
         }
 
         let max = self.sidebar_items().len().saturating_sub(1);
-        if self.sidebar_selected > max {
-            self.sidebar_selected = max;
+        if self.sidebar.selected > max {
+            self.sidebar.selected = max;
         }
 
         self.save_collections();
@@ -800,30 +849,30 @@ impl App {
     // -- URL cursor editing --
 
     pub fn url_insert(&mut self, c: char) {
-        self.url.insert(self.cursor_pos, c);
-        self.cursor_pos += c.len_utf8();
+        self.request.url.insert(self.request.cursor_pos, c);
+        self.request.cursor_pos += c.len_utf8();
     }
 
     pub fn url_backspace(&mut self) {
-        if self.cursor_pos > 0 {
-            let prev = self.url[..self.cursor_pos]
+        if self.request.cursor_pos > 0 {
+            let prev = self.request.url[..self.request.cursor_pos]
                 .char_indices()
                 .next_back()
                 .map_or(0, |(i, _)| i);
-            self.url.remove(prev);
-            self.cursor_pos = prev;
+            self.request.url.remove(prev);
+            self.request.cursor_pos = prev;
         }
     }
 
     pub fn url_delete(&mut self) {
-        if self.cursor_pos < self.url.len() {
-            self.url.remove(self.cursor_pos);
+        if self.request.cursor_pos < self.request.url.len() {
+            self.request.url.remove(self.request.cursor_pos);
         }
     }
 
     pub fn url_cursor_left(&mut self) {
-        if self.cursor_pos > 0 {
-            self.cursor_pos = self.url[..self.cursor_pos]
+        if self.request.cursor_pos > 0 {
+            self.request.cursor_pos = self.request.url[..self.request.cursor_pos]
                 .char_indices()
                 .next_back()
                 .map_or(0, |(i, _)| i);
@@ -831,8 +880,8 @@ impl App {
     }
 
     pub fn url_cursor_right(&mut self) {
-        if self.cursor_pos < self.url.len() {
-            self.cursor_pos += self.url[self.cursor_pos..]
+        if self.request.cursor_pos < self.request.url.len() {
+            self.request.cursor_pos += self.request.url[self.request.cursor_pos..]
                 .chars()
                 .next()
                 .map_or(0, char::len_utf8);
@@ -840,15 +889,15 @@ impl App {
     }
 
     pub const fn url_cursor_home(&mut self) {
-        self.cursor_pos = 0;
+        self.request.cursor_pos = 0;
     }
 
     pub fn url_cursor_end(&mut self) {
-        self.cursor_pos = self.url.len();
+        self.request.cursor_pos = self.request.url.len();
     }
 
     pub fn finish_url_edit(&mut self) {
-        self.editing_url = false;
+        self.request.editing_url = false;
         self.parse_params_from_url();
         self.sync_to_collection();
     }
@@ -856,128 +905,134 @@ impl App {
     // -- Body cursor editing --
 
     fn body_line_count(&self) -> usize {
-        self.body.split('\n').count().max(1)
+        self.request.body.split('\n').count().max(1)
     }
 
     fn body_line_len(&self, row: usize) -> usize {
-        self.body.split('\n').nth(row).map_or(0, str::len)
+        self.request.body.split('\n').nth(row).map_or(0, str::len)
     }
 
     fn body_cursor_offset(&self) -> usize {
         let mut offset = 0;
-        for (i, line) in self.body.split('\n').enumerate() {
-            if i == self.body_row {
-                return offset + self.body_col.min(line.len());
+        for (i, line) in self.request.body.split('\n').enumerate() {
+            if i == self.request.body_row {
+                return offset + self.request.body_col.min(line.len());
             }
             offset += line.len() + 1;
         }
-        self.body.len()
+        self.request.body.len()
     }
 
     pub fn body_insert(&mut self, c: char) {
         let offset = self.body_cursor_offset();
-        self.body.insert(offset, c);
-        self.body_col += c.len_utf8();
+        self.request.body.insert(offset, c);
+        self.request.body_col += c.len_utf8();
     }
 
     pub fn body_insert_newline(&mut self) {
         let offset = self.body_cursor_offset();
-        self.body.insert(offset, '\n');
-        self.body_row += 1;
-        self.body_col = 0;
+        self.request.body.insert(offset, '\n');
+        self.request.body_row += 1;
+        self.request.body_col = 0;
     }
 
     pub fn body_insert_tab(&mut self) {
         let offset = self.body_cursor_offset();
-        self.body.insert_str(offset, "  ");
-        self.body_col += 2;
+        self.request.body.insert_str(offset, "  ");
+        self.request.body_col += 2;
     }
 
     pub fn body_backspace(&mut self) {
-        if self.body_col > 0 {
+        if self.request.body_col > 0 {
             let offset = self.body_cursor_offset();
-            self.body.remove(offset - 1);
-            self.body_col -= 1;
-        } else if self.body_row > 0 {
-            let prev_len = self.body_line_len(self.body_row - 1);
+            self.request.body.remove(offset - 1);
+            self.request.body_col -= 1;
+        } else if self.request.body_row > 0 {
+            let prev_len = self.body_line_len(self.request.body_row - 1);
             let offset = self.body_cursor_offset();
-            self.body.remove(offset - 1);
-            self.body_row -= 1;
-            self.body_col = prev_len;
+            self.request.body.remove(offset - 1);
+            self.request.body_row -= 1;
+            self.request.body_col = prev_len;
         }
     }
 
     pub fn body_delete(&mut self) {
         let offset = self.body_cursor_offset();
-        if offset < self.body.len() {
-            self.body.remove(offset);
+        if offset < self.request.body.len() {
+            self.request.body.remove(offset);
         }
     }
 
     pub fn body_cursor_left(&mut self) {
-        if self.body_col > 0 {
-            self.body_col -= 1;
-        } else if self.body_row > 0 {
-            self.body_row -= 1;
-            self.body_col = self.body_line_len(self.body_row);
+        if self.request.body_col > 0 {
+            self.request.body_col -= 1;
+        } else if self.request.body_row > 0 {
+            self.request.body_row -= 1;
+            self.request.body_col = self.body_line_len(self.request.body_row);
         }
     }
 
     pub fn body_cursor_right(&mut self) {
-        let line_len = self.body_line_len(self.body_row);
-        if self.body_col < line_len {
-            self.body_col += 1;
-        } else if self.body_row + 1 < self.body_line_count() {
-            self.body_row += 1;
-            self.body_col = 0;
+        let line_len = self.body_line_len(self.request.body_row);
+        if self.request.body_col < line_len {
+            self.request.body_col += 1;
+        } else if self.request.body_row + 1 < self.body_line_count() {
+            self.request.body_row += 1;
+            self.request.body_col = 0;
         }
     }
 
     pub fn body_cursor_up(&mut self) {
-        if self.body_row > 0 {
-            self.body_row -= 1;
-            self.body_col = self.body_col.min(self.body_line_len(self.body_row));
+        if self.request.body_row > 0 {
+            self.request.body_row -= 1;
+            self.request.body_col = self
+                .request
+                .body_col
+                .min(self.body_line_len(self.request.body_row));
         }
     }
 
     pub fn body_cursor_down(&mut self) {
-        if self.body_row + 1 < self.body_line_count() {
-            self.body_row += 1;
-            self.body_col = self.body_col.min(self.body_line_len(self.body_row));
+        if self.request.body_row + 1 < self.body_line_count() {
+            self.request.body_row += 1;
+            self.request.body_col = self
+                .request
+                .body_col
+                .min(self.body_line_len(self.request.body_row));
         }
     }
 
     pub const fn body_cursor_home(&mut self) {
-        self.body_col = 0;
+        self.request.body_col = 0;
     }
 
     pub fn body_cursor_end(&mut self) {
-        self.body_col = self.body_line_len(self.body_row);
+        self.request.body_col = self.body_line_len(self.request.body_row);
     }
 
     pub fn enter_body_edit(&mut self) {
-        self.editing_body = true;
+        self.request.editing_body = true;
         let count = self.body_line_count();
-        self.body_row = count.saturating_sub(1);
-        self.body_col = self.body_line_len(self.body_row);
+        self.request.body_row = count.saturating_sub(1);
+        self.request.body_col = self.body_line_len(self.request.body_row);
     }
 
     pub fn finish_body_edit(&mut self) {
-        self.editing_body = false;
+        self.request.editing_body = false;
         self.sync_to_collection();
     }
 
     // -- cURL import --
 
     pub fn open_curl_import(&mut self) {
-        self.curl_import_buffer = String::new();
-        self.curl_import_error = false;
-        self.curl_import_open = true;
+        self.curl_io.import_buffer = String::new();
+        self.curl_io.import_error = false;
+        self.curl_io.import_open = true;
     }
 
     pub fn confirm_curl_import(&mut self) {
-        let Some(parsed) = curl::parse(&self.curl_import_buffer) else {
-            self.curl_import_error = true;
+        let Some(parsed) = curl::parse(&self.curl_io.import_buffer) else {
+            self.curl_io.import_error = true;
             return;
         };
 
@@ -1015,7 +1070,7 @@ impl App {
         };
 
         let id = req.id.clone();
-        self.requests.push(req);
+        self.sidebar.requests.push(req);
         self.save_collections();
         self.load_request_by_id(&id);
 
@@ -1024,59 +1079,63 @@ impl App {
             .iter()
             .position(|item| matches!(item, SidebarItem::Request(r) if r.id == id))
         {
-            self.sidebar_selected = idx;
+            self.sidebar.selected = idx;
         }
 
-        self.curl_import_open = false;
-        self.focus = Focus::UrlBar;
+        self.curl_io.import_open = false;
+        self.ui.focus = Focus::UrlBar;
     }
 
     pub fn open_curl_export(&mut self) {
-        self.curl_export_content =
-            curl::export(self.method.as_str(), &self.url, &self.headers, &self.body);
-        self.curl_export_open = true;
+        self.curl_io.export_content = curl::export(
+            self.request.method.as_str(),
+            &self.request.url,
+            &self.request.headers,
+            &self.request.body,
+        );
+        self.curl_io.export_open = true;
     }
 
     // -- Postman import --
 
     pub fn open_postman_import(&mut self) {
-        self.postman_import_buffer = String::new();
-        self.postman_import_error = false;
-        self.postman_import_open = true;
+        self.postman_io.buffer = String::new();
+        self.postman_io.error = false;
+        self.postman_io.open = true;
     }
 
     pub fn confirm_postman_import(&mut self) {
-        let path = std::path::Path::new(self.postman_import_buffer.trim());
+        let path = std::path::Path::new(self.postman_io.buffer.trim());
         let Some(result) = postman::import(path) else {
-            self.postman_import_error = true;
+            self.postman_io.error = true;
             return;
         };
 
-        self.folders.extend(result.folders);
-        self.requests.extend(result.requests);
+        self.sidebar.folders.extend(result.folders);
+        self.sidebar.requests.extend(result.requests);
         self.save_collections();
 
-        self.postman_import_open = false;
+        self.postman_io.open = false;
     }
 
     // -- History --
 
     pub fn open_history(&mut self) {
-        self.history = history::load();
-        self.history_selected = 0;
-        self.history_open = true;
+        self.history.entries = history::load();
+        self.history.selected = 0;
+        self.history.open = true;
     }
 
     pub fn load_from_history(&mut self) {
-        if let Some(entry) = self.history.iter().rev().nth(self.history_selected) {
-            self.method = Method::from_str(&entry.method);
-            self.url = entry.url.clone();
-            self.body = entry.body.clone();
-            self.cursor_pos = self.url.len();
-            self.body_row = 0;
-            self.body_col = 0;
-            self.response = None;
-            self.history_open = false;
+        if let Some(entry) = self.history.entries.iter().rev().nth(self.history.selected) {
+            self.request.method = Method::from_str(&entry.method);
+            self.request.url = entry.url.clone();
+            self.request.body = entry.body.clone();
+            self.request.cursor_pos = self.request.url.len();
+            self.request.body_row = 0;
+            self.request.body_col = 0;
+            self.response.last = None;
+            self.history.open = false;
         }
     }
 
@@ -1085,7 +1144,7 @@ impl App {
     pub const AUTH_TYPES: &'static [&'static str] = &["None", "Bearer", "Basic", "API Key"];
 
     pub const fn auth_type_index(&self) -> usize {
-        match &self.auth {
+        match &self.auth.config {
             Auth::None => 0,
             Auth::Bearer { .. } => 1,
             Auth::Basic { .. } => 2,
@@ -1094,10 +1153,10 @@ impl App {
     }
 
     pub fn select_auth_type(&mut self) {
-        self.auth_selecting_type = false;
-        let new_auth = match self.auth_type_selected {
+        self.auth.selecting_type = false;
+        let new_auth = match self.auth.type_selected {
             1 => {
-                let token = if let Auth::Bearer { token } = &self.auth {
+                let token = if let Auth::Bearer { token } = &self.auth.config {
                     token.clone()
                 } else {
                     String::new()
@@ -1105,15 +1164,16 @@ impl App {
                 Auth::Bearer { token }
             }
             2 => {
-                let (username, password) = if let Auth::Basic { username, password } = &self.auth {
-                    (username.clone(), password.clone())
-                } else {
-                    (String::new(), String::new())
-                };
+                let (username, password) =
+                    if let Auth::Basic { username, password } = &self.auth.config {
+                        (username.clone(), password.clone())
+                    } else {
+                        (String::new(), String::new())
+                    };
                 Auth::Basic { username, password }
             }
             3 => {
-                let (header, value) = if let Auth::ApiKey { header, value } = &self.auth {
+                let (header, value) = if let Auth::ApiKey { header, value } = &self.auth.config {
                     (header.clone(), value.clone())
                 } else {
                     ("X-API-Key".to_owned(), String::new())
@@ -1122,61 +1182,61 @@ impl App {
             }
             _ => Auth::None,
         };
-        self.auth = new_auth;
+        self.auth.config = new_auth;
         self.sync_to_collection();
 
-        if self.auth != Auth::None {
+        if self.auth.config != Auth::None {
             self.open_auth_edit();
         }
     }
 
     pub fn open_auth_edit(&mut self) {
-        self.auth_field = 0;
-        match &self.auth {
+        self.auth.field = 0;
+        match &self.auth.config {
             Auth::Bearer { token } => {
-                self.auth_buf_a = token.clone();
-                self.auth_buf_b.clear();
+                self.auth.buf_a = token.clone();
+                self.auth.buf_b.clear();
             }
             Auth::Basic { username, password } => {
-                self.auth_buf_a = username.clone();
-                self.auth_buf_b = password.clone();
+                self.auth.buf_a = username.clone();
+                self.auth.buf_b = password.clone();
             }
             Auth::ApiKey { header, value } => {
-                self.auth_buf_a = header.clone();
-                self.auth_buf_b = value.clone();
+                self.auth.buf_a = header.clone();
+                self.auth.buf_b = value.clone();
             }
             Auth::None => return,
         }
-        self.auth_editing = true;
+        self.auth.editing = true;
     }
 
     pub fn confirm_auth_edit(&mut self) {
-        match &self.auth {
+        match &self.auth.config {
             Auth::Bearer { .. } => {
-                self.auth = Auth::Bearer {
-                    token: self.auth_buf_a.clone(),
+                self.auth.config = Auth::Bearer {
+                    token: self.auth.buf_a.clone(),
                 };
             }
             Auth::Basic { .. } => {
-                self.auth = Auth::Basic {
-                    username: self.auth_buf_a.clone(),
-                    password: self.auth_buf_b.clone(),
+                self.auth.config = Auth::Basic {
+                    username: self.auth.buf_a.clone(),
+                    password: self.auth.buf_b.clone(),
                 };
             }
             Auth::ApiKey { .. } => {
-                self.auth = Auth::ApiKey {
-                    header: self.auth_buf_a.clone(),
-                    value: self.auth_buf_b.clone(),
+                self.auth.config = Auth::ApiKey {
+                    header: self.auth.buf_a.clone(),
+                    value: self.auth.buf_b.clone(),
                 };
             }
             Auth::None => {}
         }
-        self.auth_editing = false;
+        self.auth.editing = false;
         self.sync_to_collection();
     }
 
     fn apply_auth_headers(&self, headers: &mut HashMap<String, String>) {
-        match &self.auth {
+        match &self.auth.config {
             Auth::None => {}
             Auth::Bearer { token } => {
                 let resolved = self.resolve_variables(token);
@@ -1201,40 +1261,41 @@ impl App {
 
     pub fn save_environments(&self) {
         let data = environments::EnvironmentData {
-            environments: self.environments.clone(),
-            active_id: self.active_env_id.clone(),
+            environments: self.env.environments.clone(),
+            active_id: self.env.active_id.clone(),
         };
         environments::save(&data);
     }
 
     pub fn active_env_name(&self) -> Option<&str> {
-        let id = self.active_env_id.as_ref()?;
-        self.environments
+        let id = self.env.active_id.as_ref()?;
+        self.env
+            .environments
             .iter()
             .find(|e| e.id == *id)
             .map(|e| e.name.as_str())
     }
 
     pub const fn open_env_popup(&mut self) {
-        self.env_popup_selected = 0;
-        self.env_popup_open = true;
+        self.env.popup_selected = 0;
+        self.env.popup_open = true;
     }
 
     pub fn env_popup_count(&self) -> usize {
-        self.environments.len() + 1
+        self.env.environments.len() + 1
     }
 
     pub fn select_env_from_popup(&mut self) {
-        if self.env_popup_selected == 0 {
-            self.active_env_id = None;
+        if self.env.popup_selected == 0 {
+            self.env.active_id = None;
         } else {
-            let idx = self.env_popup_selected - 1;
-            if let Some(env) = self.environments.get(idx) {
-                self.active_env_id = Some(env.id.clone());
+            let idx = self.env.popup_selected - 1;
+            if let Some(env) = self.env.environments.get(idx) {
+                self.env.active_id = Some(env.id.clone());
             }
         }
         self.save_environments();
-        self.env_popup_open = false;
+        self.env.popup_open = false;
     }
 
     pub fn create_environment(&mut self) {
@@ -1243,85 +1304,85 @@ impl App {
             name: String::new(),
             variables: Vec::new(),
         };
-        self.environments.push(env);
-        self.env_popup_selected = self.environments.len();
-        self.env_name_buffer = String::new();
-        self.env_renaming = true;
+        self.env.environments.push(env);
+        self.env.popup_selected = self.env.environments.len();
+        self.env.name_buffer = String::new();
+        self.env.renaming = true;
         self.save_environments();
     }
 
     pub fn delete_env_from_popup(&mut self) {
-        if self.env_popup_selected == 0 {
+        if self.env.popup_selected == 0 {
             return;
         }
-        let idx = self.env_popup_selected - 1;
-        if idx < self.environments.len() {
-            let removed_id = self.environments[idx].id.clone();
-            self.environments.remove(idx);
-            if self.active_env_id.as_deref() == Some(&removed_id) {
-                self.active_env_id = None;
+        let idx = self.env.popup_selected - 1;
+        if idx < self.env.environments.len() {
+            let removed_id = self.env.environments[idx].id.clone();
+            self.env.environments.remove(idx);
+            if self.env.active_id.as_deref() == Some(&removed_id) {
+                self.env.active_id = None;
             }
             let max = self.env_popup_count().saturating_sub(1);
-            if self.env_popup_selected > max {
-                self.env_popup_selected = max;
+            if self.env.popup_selected > max {
+                self.env.popup_selected = max;
             }
             self.save_environments();
         }
     }
 
     pub fn start_env_rename(&mut self) {
-        if self.env_popup_selected == 0 {
+        if self.env.popup_selected == 0 {
             return;
         }
-        let idx = self.env_popup_selected - 1;
-        if let Some(env) = self.environments.get(idx) {
-            self.env_name_buffer = env.name.clone();
-            self.env_renaming = true;
+        let idx = self.env.popup_selected - 1;
+        if let Some(env) = self.env.environments.get(idx) {
+            self.env.name_buffer = env.name.clone();
+            self.env.renaming = true;
         }
     }
 
     pub fn confirm_env_rename(&mut self) {
-        if self.env_popup_selected == 0 {
-            self.env_renaming = false;
+        if self.env.popup_selected == 0 {
+            self.env.renaming = false;
             return;
         }
-        let idx = self.env_popup_selected - 1;
-        if self.env_name_buffer.trim().is_empty() {
+        let idx = self.env.popup_selected - 1;
+        if self.env.name_buffer.trim().is_empty() {
             self.cancel_env_rename();
             return;
         }
-        if let Some(env) = self.environments.get_mut(idx) {
-            env.name.clone_from(&self.env_name_buffer);
+        if let Some(env) = self.env.environments.get_mut(idx) {
+            env.name.clone_from(&self.env.name_buffer);
         }
-        self.env_renaming = false;
+        self.env.renaming = false;
         self.save_environments();
     }
 
     pub fn cancel_env_rename(&mut self) {
-        if self.env_popup_selected > 0 {
-            let idx = self.env_popup_selected - 1;
-            if idx < self.environments.len() && self.environments[idx].name.is_empty() {
-                self.environments.remove(idx);
+        if self.env.popup_selected > 0 {
+            let idx = self.env.popup_selected - 1;
+            if idx < self.env.environments.len() && self.env.environments[idx].name.is_empty() {
+                self.env.environments.remove(idx);
                 let max = self.env_popup_count().saturating_sub(1);
-                if self.env_popup_selected > max {
-                    self.env_popup_selected = max;
+                if self.env.popup_selected > max {
+                    self.env.popup_selected = max;
                 }
                 self.save_environments();
             }
         }
-        self.env_renaming = false;
+        self.env.renaming = false;
     }
 
     pub fn open_env_import(&mut self) {
-        self.env_import_buffer = String::new();
-        self.env_import_error = false;
-        self.env_import_open = true;
+        self.env.import.buffer = String::new();
+        self.env.import.error = false;
+        self.env.import.open = true;
     }
 
     pub fn confirm_env_import(&mut self) {
-        let path = std::path::Path::new(self.env_import_buffer.trim());
+        let path = std::path::Path::new(self.env.import.buffer.trim());
         let Some(vars) = environments::parse_dotenv(path) else {
-            self.env_import_error = true;
+            self.env.import.error = true;
             return;
         };
 
@@ -1336,29 +1397,30 @@ impl App {
             name,
             variables: vars,
         };
-        self.environments.push(env);
-        self.env_popup_selected = self.environments.len();
+        self.env.environments.push(env);
+        self.env.popup_selected = self.env.environments.len();
         self.save_environments();
-        self.env_import_open = false;
+        self.env.import.open = false;
     }
 
     pub fn open_env_editor(&mut self) {
-        if self.env_popup_selected == 0 {
+        if self.env.popup_selected == 0 {
             return;
         }
-        let idx = self.env_popup_selected - 1;
-        if let Some(env) = self.environments.get(idx) {
-            self.env_editor_id = env.id.clone();
-            self.env_editor_selected = 0;
-            self.env_popup_open = false;
-            self.env_editor_open = true;
+        let idx = self.env.popup_selected - 1;
+        if let Some(env) = self.env.environments.get(idx) {
+            self.env.editor.id = env.id.clone();
+            self.env.editor.selected = 0;
+            self.env.popup_open = false;
+            self.env.editor.open = true;
         }
     }
 
     fn edited_env(&self) -> Option<&Environment> {
-        self.environments
+        self.env
+            .environments
             .iter()
-            .find(|e| e.id == self.env_editor_id)
+            .find(|e| e.id == self.env.editor.id)
     }
 
     pub fn env_editor_count(&self) -> usize {
@@ -1366,73 +1428,73 @@ impl App {
     }
 
     pub fn start_add_var(&mut self) {
-        self.env_var_key_buffer.clear();
-        self.env_var_value_buffer.clear();
-        self.env_var_field = 0;
-        self.env_editing_var = true;
+        self.env.editor.var_key_buffer.clear();
+        self.env.editor.var_value_buffer.clear();
+        self.env.editor.var_field = 0;
+        self.env.editor.editing_var = true;
     }
 
     pub fn start_edit_var(&mut self) {
-        let id = self.env_editor_id.clone();
-        let Some(env) = self.environments.iter().find(|e| e.id == id) else {
+        let id = self.env.editor.id.clone();
+        let Some(env) = self.env.environments.iter().find(|e| e.id == id) else {
             return;
         };
-        if self.env_editor_selected >= env.variables.len() {
+        if self.env.editor.selected >= env.variables.len() {
             self.start_add_var();
             return;
         }
-        self.env_var_key_buffer = env.variables[self.env_editor_selected].key.clone();
-        self.env_var_value_buffer = env.variables[self.env_editor_selected].value.clone();
-        self.env_var_field = 0;
-        self.env_editing_var = true;
+        self.env.editor.var_key_buffer = env.variables[self.env.editor.selected].key.clone();
+        self.env.editor.var_value_buffer = env.variables[self.env.editor.selected].value.clone();
+        self.env.editor.var_field = 0;
+        self.env.editor.editing_var = true;
     }
 
     pub fn confirm_var_edit(&mut self) {
-        if self.env_var_key_buffer.trim().is_empty() {
-            self.env_editing_var = false;
+        if self.env.editor.var_key_buffer.trim().is_empty() {
+            self.env.editor.editing_var = false;
             return;
         }
-        let id = self.env_editor_id.clone();
-        let Some(env) = self.environments.iter_mut().find(|e| e.id == id) else {
+        let id = self.env.editor.id.clone();
+        let Some(env) = self.env.environments.iter_mut().find(|e| e.id == id) else {
             return;
         };
-        if self.env_editor_selected < env.variables.len() {
-            let var = &mut env.variables[self.env_editor_selected];
-            var.key.clone_from(&self.env_var_key_buffer);
-            var.value.clone_from(&self.env_var_value_buffer);
+        if self.env.editor.selected < env.variables.len() {
+            let var = &mut env.variables[self.env.editor.selected];
+            var.key.clone_from(&self.env.editor.var_key_buffer);
+            var.value.clone_from(&self.env.editor.var_value_buffer);
         } else {
             env.variables.push(Variable {
-                key: self.env_var_key_buffer.clone(),
-                value: self.env_var_value_buffer.clone(),
+                key: self.env.editor.var_key_buffer.clone(),
+                value: self.env.editor.var_value_buffer.clone(),
                 secret: false,
             });
         }
-        self.env_editing_var = false;
+        self.env.editor.editing_var = false;
         self.save_environments();
     }
 
     pub fn delete_var(&mut self) {
-        let id = self.env_editor_id.clone();
-        let Some(env) = self.environments.iter_mut().find(|e| e.id == id) else {
+        let id = self.env.editor.id.clone();
+        let Some(env) = self.env.environments.iter_mut().find(|e| e.id == id) else {
             return;
         };
-        if self.env_editor_selected < env.variables.len() {
-            env.variables.remove(self.env_editor_selected);
+        if self.env.editor.selected < env.variables.len() {
+            env.variables.remove(self.env.editor.selected);
             let max = env.variables.len();
-            if self.env_editor_selected > max {
-                self.env_editor_selected = max;
+            if self.env.editor.selected > max {
+                self.env.editor.selected = max;
             }
             self.save_environments();
         }
     }
 
     pub fn toggle_var_secret(&mut self) {
-        let id = self.env_editor_id.clone();
-        let Some(env) = self.environments.iter_mut().find(|e| e.id == id) else {
+        let id = self.env.editor.id.clone();
+        let Some(env) = self.env.environments.iter_mut().find(|e| e.id == id) else {
             return;
         };
-        if self.env_editor_selected < env.variables.len() {
-            let var = &mut env.variables[self.env_editor_selected];
+        if self.env.editor.selected < env.variables.len() {
+            let var = &mut env.variables[self.env.editor.selected];
             var.secret = !var.secret;
             self.save_environments();
         }
@@ -1440,14 +1502,14 @@ impl App {
 
     fn resolve_variables(&self, input: &str) -> String {
         let mut result = self.resolve_chain_refs(input);
-        for (k, v) in &self.extracted_vars {
+        for (k, v) in &self.extractors.extracted {
             let pattern = format!("{{{{{k}}}}}");
             result = result.replace(&pattern, v);
         }
-        let Some(env_id) = &self.active_env_id else {
+        let Some(env_id) = &self.env.active_id else {
             return result;
         };
-        let Some(env) = self.environments.iter().find(|e| e.id == *env_id) else {
+        let Some(env) = self.env.environments.iter().find(|e| e.id == *env_id) else {
             return result;
         };
         for var in &env.variables {
@@ -1458,7 +1520,7 @@ impl App {
     }
 
     /// Expands `{{$res:RequestName.path.to.field}}` markers using the bodies
-    /// of previously sent requests stored in `self.last_responses`.
+    /// of previously sent requests stored in `self.response.last_bodies`.
     fn resolve_chain_refs(&self, input: &str) -> String {
         const OPEN: &str = "{{$res:";
         const CLOSE: &str = "}}";
@@ -1483,7 +1545,7 @@ impl App {
         let (name, path) = expr
             .split_once('.')
             .map_or((expr, ""), |(n, p)| (n.trim(), p.trim()));
-        let Some(body) = self.last_responses.get(name) else {
+        let Some(body) = self.response.last_bodies.get(name) else {
             return format!("{{{{$res:{expr}}}}}");
         };
         if path.is_empty() {
@@ -1511,66 +1573,67 @@ impl App {
     // -- Search --
 
     pub fn open_search(&mut self) {
-        self.response_search_buf = self.response_search.clone();
-        self.response_searching = true;
+        self.response.search_buf = self.response.search.clone();
+        self.response.searching = true;
     }
 
     pub fn confirm_search(&mut self) {
-        self.response_search = self.response_search_buf.clone();
-        self.response_searching = false;
-        self.response_match_idx = 0;
+        self.response.search = self.response.search_buf.clone();
+        self.response.searching = false;
+        self.response.match_idx = 0;
         self.scroll_to_match();
     }
 
     pub const fn cancel_search(&mut self) {
-        self.response_searching = false;
+        self.response.searching = false;
     }
 
     pub fn clear_search(&mut self) {
-        self.response_search.clear();
-        self.response_searching = false;
+        self.response.search.clear();
+        self.response.searching = false;
     }
 
     pub fn next_match(&mut self) {
-        if self.response_search.is_empty() {
+        if self.response.search.is_empty() {
             return;
         }
-        self.response_match_idx += 1;
+        self.response.match_idx += 1;
         self.scroll_to_match();
     }
 
     pub fn prev_match(&mut self) {
-        if self.response_search.is_empty() {
+        if self.response.search.is_empty() {
             return;
         }
-        self.response_match_idx = self.response_match_idx.saturating_sub(1);
+        self.response.match_idx = self.response.match_idx.saturating_sub(1);
         self.scroll_to_match();
     }
 
     fn scroll_to_match(&mut self) {
         let body = self.formatted_response_body();
-        if self.response_search.is_empty() {
+        if self.response.search.is_empty() {
             return;
         }
-        let needle = self.response_search.to_ascii_lowercase();
+        let needle = self.response.search.to_ascii_lowercase();
         let mut match_count = 0;
         for (i, line) in body.lines().enumerate() {
             if line.to_ascii_lowercase().contains(&needle) {
-                if match_count == self.response_match_idx {
-                    self.response_scroll = i as u16;
+                if match_count == self.response.match_idx {
+                    self.response.scroll = i as u16;
                     return;
                 }
                 match_count += 1;
             }
         }
         if match_count > 0 {
-            self.response_match_idx = 0;
+            self.response.match_idx = 0;
             self.scroll_to_match();
         }
     }
 
     fn resolve_form_entries(&self) -> Vec<(String, String)> {
-        self.form_editor
+        self.request
+            .form_editor
             .entries
             .iter()
             .map(|(k, v)| (self.resolve_variables(k), self.resolve_variables(v)))
@@ -1580,51 +1643,51 @@ impl App {
     // -- Request --
 
     pub fn open_timeout_popup(&mut self) {
-        self.timeout_buffer = self.timeout_secs.to_string();
-        self.timeout_error = false;
-        self.timeout_popup_open = true;
+        self.timeout.buffer = self.timeout.secs.to_string();
+        self.timeout.error = false;
+        self.timeout.popup_open = true;
     }
 
     pub fn confirm_timeout_popup(&mut self) {
-        match self.timeout_buffer.trim().parse::<u64>() {
+        match self.timeout.buffer.trim().parse::<u64>() {
             Ok(n) if n > 0 && n <= 3600 => {
-                self.timeout_secs = n;
-                self.timeout_popup_open = false;
+                self.timeout.secs = n;
+                self.timeout.popup_open = false;
                 self.sync_to_collection();
             }
-            _ => self.timeout_error = true,
+            _ => self.timeout.error = true,
         }
     }
 
     pub const TLS_FIELDS: usize = 5;
 
     pub fn open_tls_popup(&mut self) {
-        self.tls_popup_selected = 0;
-        self.tls_editing = false;
-        self.tls_edit_buffer.clear();
-        self.tls_popup_open = true;
+        self.tls.popup_selected = 0;
+        self.tls.editing = false;
+        self.tls.edit_buffer.clear();
+        self.tls.popup_open = true;
     }
 
     pub const fn tls_popup_down(&mut self) {
-        if self.tls_popup_selected + 1 < Self::TLS_FIELDS {
-            self.tls_popup_selected += 1;
+        if self.tls.popup_selected + 1 < Self::TLS_FIELDS {
+            self.tls.popup_selected += 1;
         }
     }
 
     pub const fn tls_popup_up(&mut self) {
-        if self.tls_popup_selected > 0 {
-            self.tls_popup_selected -= 1;
+        if self.tls.popup_selected > 0 {
+            self.tls.popup_selected -= 1;
         }
     }
 
     pub fn tls_popup_activate(&mut self) {
-        match self.tls_popup_selected {
+        match self.tls.popup_selected {
             0 => {
-                self.verify_tls = !self.verify_tls;
+                self.tls.verify = !self.tls.verify;
                 self.sync_to_collection();
             }
             4 => {
-                self.tls_min_version = match self.tls_min_version.as_str() {
+                self.tls.min_version = match self.tls.min_version.as_str() {
                     "" => "1.2".to_owned(),
                     "1.2" => "1.3".to_owned(),
                     _ => String::new(),
@@ -1632,160 +1695,165 @@ impl App {
                 self.sync_to_collection();
             }
             n => {
-                self.tls_edit_buffer = match n {
-                    1 => self.ca_cert_path.clone(),
-                    2 => self.client_cert_path.clone(),
-                    3 => self.client_key_path.clone(),
+                self.tls.edit_buffer = match n {
+                    1 => self.tls.ca_cert.clone(),
+                    2 => self.tls.client_cert.clone(),
+                    3 => self.tls.client_key.clone(),
                     _ => String::new(),
                 };
-                self.tls_editing = true;
+                self.tls.editing = true;
             }
         }
     }
 
     pub fn tls_popup_clear_field(&mut self) {
-        match self.tls_popup_selected {
-            1 => self.ca_cert_path.clear(),
-            2 => self.client_cert_path.clear(),
-            3 => self.client_key_path.clear(),
+        match self.tls.popup_selected {
+            1 => self.tls.ca_cert.clear(),
+            2 => self.tls.client_cert.clear(),
+            3 => self.tls.client_key.clear(),
             _ => return,
         }
         self.sync_to_collection();
     }
 
     pub fn tls_confirm_edit(&mut self) {
-        let val = self.tls_edit_buffer.trim().to_owned();
-        match self.tls_popup_selected {
-            1 => self.ca_cert_path = val,
-            2 => self.client_cert_path = val,
-            3 => self.client_key_path = val,
+        let val = self.tls.edit_buffer.trim().to_owned();
+        match self.tls.popup_selected {
+            1 => self.tls.ca_cert = val,
+            2 => self.tls.client_cert = val,
+            3 => self.tls.client_key = val,
             _ => {}
         }
-        self.tls_editing = false;
+        self.tls.editing = false;
         self.sync_to_collection();
     }
 
     pub const fn open_assertions_popup(&mut self) {
-        self.assertions_popup_open = true;
-        self.assertion_editing = false;
-        self.assertions_selected = 0;
+        self.assertions.popup_open = true;
+        self.assertions.editing = false;
+        self.assertions.selected = 0;
     }
 
     pub fn assertions_popup_down(&mut self) {
-        let max = self.assertions.len();
-        if self.assertions_selected < max {
-            self.assertions_selected += 1;
+        let max = self.assertions.exprs.len();
+        if self.assertions.selected < max {
+            self.assertions.selected += 1;
         }
     }
 
     pub const fn assertions_popup_up(&mut self) {
-        if self.assertions_selected > 0 {
-            self.assertions_selected -= 1;
+        if self.assertions.selected > 0 {
+            self.assertions.selected -= 1;
         }
     }
 
     pub fn assertions_start_add(&mut self) {
-        self.assertion_edit_buffer.clear();
-        self.assertion_editing_existing = false;
-        self.assertion_editing = true;
+        self.assertions.edit_buffer.clear();
+        self.assertions.editing_existing = false;
+        self.assertions.editing = true;
     }
 
     pub fn assertions_start_edit(&mut self) {
-        if self.assertions_selected >= self.assertions.len() {
+        if self.assertions.selected >= self.assertions.exprs.len() {
             self.assertions_start_add();
             return;
         }
-        self.assertion_edit_buffer
-            .clone_from(&self.assertions[self.assertions_selected]);
-        self.assertion_editing_existing = true;
-        self.assertion_editing = true;
+        self.assertions
+            .edit_buffer
+            .clone_from(&self.assertions.exprs[self.assertions.selected]);
+        self.assertions.editing_existing = true;
+        self.assertions.editing = true;
     }
 
     pub fn assertions_confirm_edit(&mut self) {
-        let value = self.assertion_edit_buffer.trim().to_owned();
+        let value = self.assertions.edit_buffer.trim().to_owned();
         if value.is_empty() {
-            self.assertion_editing = false;
+            self.assertions.editing = false;
             return;
         }
-        if self.assertion_editing_existing && self.assertions_selected < self.assertions.len() {
-            self.assertions[self.assertions_selected] = value;
+        if self.assertions.editing_existing
+            && self.assertions.selected < self.assertions.exprs.len()
+        {
+            self.assertions.exprs[self.assertions.selected] = value;
         } else {
-            self.assertions.push(value);
-            self.assertions_selected = self.assertions.len() - 1;
+            self.assertions.exprs.push(value);
+            self.assertions.selected = self.assertions.exprs.len() - 1;
         }
-        self.assertion_editing = false;
+        self.assertions.editing = false;
         self.sync_to_collection();
     }
 
     pub fn assertions_delete(&mut self) {
-        if self.assertions_selected < self.assertions.len() {
-            self.assertions.remove(self.assertions_selected);
-            if self.assertions_selected > 0 && self.assertions_selected >= self.assertions.len() {
-                self.assertions_selected = self.assertions.len().saturating_sub(1);
+        if self.assertions.selected < self.assertions.exprs.len() {
+            self.assertions.exprs.remove(self.assertions.selected);
+            if self.assertions.selected > 0
+                && self.assertions.selected >= self.assertions.exprs.len()
+            {
+                self.assertions.selected = self.assertions.exprs.len().saturating_sub(1);
             }
             self.sync_to_collection();
         }
     }
 
     pub const fn open_extractors_popup(&mut self) {
-        self.extractor_editor.editing = false;
-        self.extractor_editor.selected = 0;
-        self.extractors_popup_open = true;
+        self.extractors.editor.editing = false;
+        self.extractors.editor.selected = 0;
+        self.extractors.popup_open = true;
     }
 
     fn apply_extractors(&mut self, body: &str) {
-        if self.extractor_editor.entries.is_empty() {
+        if self.extractors.editor.entries.is_empty() {
             return;
         }
         let Ok(value) = serde_json::from_str::<serde_json::Value>(body) else {
             return;
         };
-        for (name, path) in &self.extractor_editor.entries {
+        for (name, path) in &self.extractors.editor.entries {
             let name = name.trim();
             if name.is_empty() {
                 continue;
             }
             if let Some(extracted) = jsonpath_lookup(&value, path.trim()) {
-                self.extracted_vars.insert(name.to_owned(), extracted);
+                self.extractors.extracted.insert(name.to_owned(), extracted);
             }
         }
     }
 
     pub fn open_cookies_popup(&mut self) {
-        self.cookie_store.purge_expired();
-        self.cookies_popup_selected = 0;
-        self.cookies_popup_open = true;
+        self.cookies.store.purge_expired();
+        self.cookies.popup_selected = 0;
+        self.cookies.popup_open = true;
     }
 
     pub fn cookies_popup_down(&mut self) {
-        let len = self.cookie_store.cookies.len();
-        if len > 0 && self.cookies_popup_selected + 1 < len {
-            self.cookies_popup_selected += 1;
+        let len = self.cookies.store.cookies.len();
+        if len > 0 && self.cookies.popup_selected + 1 < len {
+            self.cookies.popup_selected += 1;
         }
     }
 
     pub const fn cookies_popup_up(&mut self) {
-        if self.cookies_popup_selected > 0 {
-            self.cookies_popup_selected -= 1;
+        if self.cookies.popup_selected > 0 {
+            self.cookies.popup_selected -= 1;
         }
     }
 
     pub fn cookies_popup_delete(&mut self) {
-        if self.cookie_store.cookies.is_empty() {
+        if self.cookies.store.cookies.is_empty() {
             return;
         }
-        self.cookie_store.remove(self.cookies_popup_selected);
-        let len = self.cookie_store.cookies.len();
-        if self.cookies_popup_selected >= len && len > 0 {
-            self.cookies_popup_selected = len - 1;
+        self.cookies.store.remove(self.cookies.popup_selected);
+        let len = self.cookies.store.cookies.len();
+        if self.cookies.popup_selected >= len && len > 0 {
+            self.cookies.popup_selected = len - 1;
         }
-        cookies::save(&self.cookie_store);
+        cookies::save(&self.cookies.store);
     }
 
     pub fn cookies_popup_clear_all(&mut self) {
-        self.cookie_store.clear();
-        self.cookies_popup_selected = 0;
-        cookies::save(&self.cookie_store);
+        self.cookies.store.clear();
+        self.cookies.popup_selected = 0;
+        cookies::save(&self.cookies.store);
     }
 
     pub fn toggle_follow_redirects(&mut self) {
@@ -1797,14 +1865,15 @@ impl App {
         if self.pending.is_some() {
             return;
         }
-        self.loading = true;
-        self.response = None;
-        self.response_scroll = 0;
+        self.response.loading = true;
+        self.response.last = None;
+        self.response.scroll = 0;
         self.sync_to_collection();
 
-        let resolved_url = self.resolve_variables(&self.url);
-        let resolved_body = self.resolve_variables(&self.body);
+        let resolved_url = self.resolve_variables(&self.request.url);
+        let resolved_body = self.resolve_variables(&self.request.body);
         let mut resolved_headers: HashMap<String, String> = self
+            .request
             .headers
             .iter()
             .map(|(k, v)| (k.clone(), self.resolve_variables(v)))
@@ -1815,7 +1884,7 @@ impl App {
             .keys()
             .any(|k| k.eq_ignore_ascii_case("cookie"));
         if !has_cookie_header {
-            if let Some(value) = self.cookie_store.header_for(&resolved_url) {
+            if let Some(value) = self.cookies.store.header_for(&resolved_url) {
                 resolved_headers.insert("Cookie".to_owned(), value);
             }
         }
@@ -1823,8 +1892,8 @@ impl App {
         if !resolved_headers.contains_key("Content-Type")
             && !resolved_headers.contains_key("content-type")
         {
-            let ct = match self.body_type {
-                BodyType::Raw => Some(self.content_type.mime()),
+            let ct = match self.request.body_type {
+                BodyType::Raw => Some(self.request.content_type.mime()),
                 BodyType::Form => Some("application/x-www-form-urlencoded"),
                 BodyType::Multipart => None,
             };
@@ -1833,7 +1902,7 @@ impl App {
             }
         }
 
-        let body = match self.body_type {
+        let body = match self.request.body_type {
             BodyType::Raw => {
                 if resolved_body.is_empty() {
                     None
@@ -1860,17 +1929,17 @@ impl App {
         };
 
         let opts = RequestOptions {
-            method: self.method.as_str().to_owned(),
+            method: self.request.method.as_str().to_owned(),
             url: resolved_url,
             headers: resolved_headers,
             body,
             follow_redirects: self.follow_redirects,
-            timeout_secs: self.timeout_secs,
-            verify_tls: self.verify_tls,
-            ca_cert_path: self.ca_cert_path.clone(),
-            client_cert_path: self.client_cert_path.clone(),
-            client_key_path: self.client_key_path.clone(),
-            tls_min_version: self.tls_min_version.clone(),
+            timeout_secs: self.timeout.secs,
+            verify_tls: self.tls.verify,
+            ca_cert_path: self.tls.ca_cert.clone(),
+            client_cert_path: self.tls.client_cert.clone(),
+            client_key_path: self.tls.client_key.clone(),
+            tls_min_version: self.tls.min_version.clone(),
         };
 
         let resolved_for_pending = opts.url.clone();
@@ -1880,33 +1949,34 @@ impl App {
             let _ = tx.send(result);
         });
 
-        let request_name = self.active_request_id.as_ref().and_then(|id| {
-            self.requests
+        let request_name = self.sidebar.active_request_id.as_ref().and_then(|id| {
+            self.sidebar
+                .requests
                 .iter()
                 .find(|r| &r.id == id)
                 .map(|r| r.name.clone())
         });
         self.pending = Some(PendingRequest {
             rx,
-            method: self.method.as_str().to_owned(),
-            url: self.url.clone(),
+            method: self.request.method.as_str().to_owned(),
+            url: self.request.url.clone(),
             resolved_url: resolved_for_pending,
-            body: self.body.clone(),
+            body: self.request.body.clone(),
             request_name,
         });
     }
 
     fn persist_last_response(&mut self) {
-        let Some(id) = self.active_request_id.clone() else {
+        let Some(id) = self.sidebar.active_request_id.clone() else {
             return;
         };
-        let (last_response, last_error) = match &self.response {
+        let (last_response, last_error) = match &self.response.last {
             Some(Ok(r)) => (Some(r.clone()), None),
             Some(Err(e)) => (None, Some(e.clone())),
             None => (None, None),
         };
-        let last_assertion_results = self.assertion_results.clone();
-        if let Some(req) = self.requests.iter_mut().find(|r| r.id == id) {
+        let last_assertion_results = self.assertions.results.clone();
+        if let Some(req) = self.sidebar.requests.iter_mut().find(|r| r.id == id) {
             req.last_response = last_response;
             req.last_error = last_error;
             req.last_assertion_results = last_assertion_results;
@@ -1926,20 +1996,24 @@ impl App {
                 };
                 if let Ok(resp) = &result {
                     if !resp.set_cookies.is_empty() {
-                        self.cookie_store
+                        self.cookies
+                            .store
                             .ingest(&pending.resolved_url, &resp.set_cookies);
-                        self.cookie_store.purge_expired();
-                        cookies::save(&self.cookie_store);
+                        self.cookies.store.purge_expired();
+                        cookies::save(&self.cookies.store);
                     }
                     if let Some(name) = &pending.request_name {
-                        self.last_responses.insert(name.clone(), resp.body.clone());
+                        self.response
+                            .last_bodies
+                            .insert(name.clone(), resp.body.clone());
                     }
                     let body = resp.body.clone();
                     self.apply_extractors(&body);
-                    self.assertion_results = assertions::evaluate_all(&self.assertions, resp);
+                    self.assertions.results =
+                        assertions::evaluate_all(&self.assertions.exprs, resp);
                 }
                 if result.is_err() {
-                    self.assertion_results.clear();
+                    self.assertions.results.clear();
                 }
                 let entry = HistoryEntry {
                     method: pending.method.clone(),
@@ -1952,15 +2026,15 @@ impl App {
                         .map_or(0, |d| d.as_secs()),
                 };
                 history::append(entry);
-                self.response = Some(result);
-                self.loading = false;
+                self.response.last = Some(result);
+                self.response.loading = false;
                 self.persist_last_response();
                 true
             }
             Err(mpsc::TryRecvError::Empty) => false,
             Err(mpsc::TryRecvError::Disconnected) => {
-                self.response = Some(Err("request thread died".to_owned()));
-                self.loading = false;
+                self.response.last = Some(Err("request thread died".to_owned()));
+                self.response.loading = false;
                 self.pending = None;
                 true
             }
@@ -1968,7 +2042,7 @@ impl App {
     }
 
     pub fn formatted_response_body(&self) -> String {
-        match &self.response {
+        match &self.response.last {
             Some(Ok(resp)) => serde_json::from_str::<serde_json::Value>(&resp.body)
                 .ok()
                 .and_then(|json| serde_json::to_string_pretty(&json).ok())
@@ -1981,12 +2055,12 @@ impl App {
     pub fn copy_response_to_clipboard(&mut self) {
         let text = self.formatted_response_body();
         if text.is_empty() {
-            self.clipboard_msg = Some("Nothing to copy".to_owned());
+            self.response.clipboard_msg = Some("Nothing to copy".to_owned());
             return;
         }
         match clipboard::copy_to_clipboard(&text) {
-            Ok(()) => self.clipboard_msg = Some("Copied to clipboard".to_owned()),
-            Err(e) => self.clipboard_msg = Some(e),
+            Ok(()) => self.response.clipboard_msg = Some("Copied to clipboard".to_owned()),
+            Err(e) => self.response.clipboard_msg = Some(e),
         }
     }
 }

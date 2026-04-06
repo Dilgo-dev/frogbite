@@ -5,18 +5,18 @@ use super::*;
 use crate::app::{App, Focus, Method, SidebarItem};
 
 pub(super) fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
-    let is_focused = app.focus == Focus::Sidebar;
+    let is_focused = app.ui.focus == Focus::Sidebar;
 
     let env_label = app.active_env_name().map(|n| format!(" frogbite [{n}] "));
-    let title = if app.confirm_delete {
+    let title = if app.sidebar.confirm_delete {
         " Delete? (y=yes, Esc=no) ".to_owned()
     } else {
         env_label.unwrap_or_else(|| " frogbite ".to_owned())
     };
 
-    let title_style = if app.confirm_delete {
+    let title_style = if app.sidebar.confirm_delete {
         Style::default().fg(RED).bold()
-    } else if app.active_env_id.is_some() {
+    } else if app.env.active_id.is_some() {
         Style::default().fg(TEAL).bold()
     } else {
         Style::default().fg(GREEN).bold()
@@ -38,14 +38,14 @@ pub(super) fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
         .iter()
         .enumerate()
         .map(|(i, item)| {
-            let selected = i == app.sidebar_selected;
-            let editing_name = selected && app.editing_sidebar_name;
+            let selected = i == app.sidebar.selected;
+            let editing_name = selected && app.sidebar.editing_name;
 
             let line = match item {
                 SidebarItem::Folder(f) => {
                     let arrow = if f.expanded { "v " } else { "> " };
                     let name = if editing_name {
-                        format!("{}\u{2588}", &app.sidebar_edit_buffer)
+                        format!("{}\u{2588}", &app.sidebar.edit_buffer)
                     } else {
                         f.name.clone()
                     };
@@ -64,10 +64,10 @@ pub(super) fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
                 SidebarItem::Request(req) => {
                     let method_str = format!("{:>6}", Method::from_str(&req.method).as_str());
                     let method = Method::from_str(&req.method);
-                    let is_active = app.active_request_id.as_deref() == Some(&req.id);
+                    let is_active = app.sidebar.active_request_id.as_deref() == Some(&req.id);
 
                     let name = if editing_name {
-                        format!("{}\u{2588}", &app.sidebar_edit_buffer)
+                        format!("{}\u{2588}", &app.sidebar.edit_buffer)
                     } else {
                         req.name.clone()
                     };

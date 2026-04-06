@@ -43,7 +43,7 @@ pub const fn status_color(status: u16) -> Color {
 }
 
 pub fn draw(frame: &mut Frame, app: &App) {
-    match app.view {
+    match app.ui.view {
         View::Main => draw_main(frame, app),
         View::Settings => settings::draw_settings(frame, app),
     }
@@ -72,43 +72,43 @@ fn draw_main(frame: &mut Frame, app: &App) {
     request::draw_request_panel(frame, app, content_layout[1]);
     response::draw_response(frame, app, content_layout[2]);
 
-    if app.method_popup {
+    if app.method_popup.open {
         modals::draw_method_popup(frame, app);
     }
-    if app.history_open {
+    if app.history.open {
         modals::draw_history_overlay(frame, app);
     }
-    if app.curl_import_open {
+    if app.curl_io.import_open {
         modals::draw_curl_import_popup(frame, app);
     }
-    if app.curl_export_open {
+    if app.curl_io.export_open {
         modals::draw_curl_export_popup(frame, app);
     }
-    if app.postman_import_open {
+    if app.postman_io.open {
         modals::draw_postman_import_popup(frame, app);
     }
-    if app.env_popup_open || app.env_renaming {
+    if app.env.popup_open || app.env.renaming {
         modals::draw_env_popup(frame, app);
     }
-    if app.env_import_open {
+    if app.env.import.open {
         modals::draw_env_import_popup(frame, app);
     }
-    if app.timeout_popup_open {
+    if app.timeout.popup_open {
         modals::draw_timeout_popup(frame, app);
     }
-    if app.tls_popup_open {
+    if app.tls.popup_open {
         modals::draw_tls_popup(frame, app);
     }
-    if app.cookies_popup_open {
+    if app.cookies.popup_open {
         modals::draw_cookies_popup(frame, app);
     }
-    if app.extractors_popup_open {
+    if app.extractors.popup_open {
         modals::draw_extractors_popup(frame, app);
     }
-    if app.assertions_popup_open {
+    if app.assertions.popup_open {
         modals::draw_assertions_popup(frame, app);
     }
-    if app.env_editor_open {
+    if app.env.editor.open {
         modals::draw_env_editor(frame, app);
     }
 }
@@ -117,75 +117,78 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
     let area = frame.area();
     let help_area = Rect::new(0, area.height.saturating_sub(1), area.width, 1);
 
-    let help = if app.response_searching {
+    let help = if app.response.searching {
         "type search term  Enter:search  Esc:cancel"
-    } else if app.auth_editing {
+    } else if app.auth.editing {
         "type value  Tab:switch  Enter:save  Esc:cancel"
-    } else if app.auth_selecting_type {
+    } else if app.auth.selecting_type {
         "j/k:navigate  Enter:select  Esc:cancel"
-    } else if app.form_editor.editing || app.header_editor.editing || app.param_editor.editing {
+    } else if app.request.form_editor.editing
+        || app.request.header_editor.editing
+        || app.request.param_editor.editing
+    {
         "type key/value  Tab:switch  Enter:save  Esc:cancel"
-    } else if app.env_editing_var {
+    } else if app.env.editor.editing_var {
         "type key/value  Tab:switch field  Enter:save  Esc:cancel"
-    } else if app.env_editor_open {
+    } else if app.env.editor.open {
         "j/k:navigate  Enter/a:edit  d:delete  s:secret  Esc:back"
-    } else if app.env_renaming {
+    } else if app.env.renaming {
         "type name  Enter:confirm  Esc:cancel"
-    } else if app.assertions_popup_open {
-        if app.assertion_editing {
+    } else if app.assertions.popup_open {
+        if app.assertions.editing {
             "type assertion  Enter:save  Esc:cancel"
         } else {
             "j/k:nav  a:add  e:edit  d:delete  Esc:close"
         }
-    } else if app.extractors_popup_open {
-        if app.extractor_editor.editing {
+    } else if app.extractors.popup_open {
+        if app.extractors.editor.editing {
             "type name/path  Tab:switch  Enter:save  Esc:cancel"
         } else {
             "j/k:nav  a:add  e:edit  d:delete  Esc:close"
         }
-    } else if app.cookies_popup_open {
+    } else if app.cookies.popup_open {
         "j/k:nav  d:delete  D:clear all  Esc:close"
-    } else if app.tls_popup_open {
-        if app.tls_editing {
+    } else if app.tls.popup_open {
+        if app.tls.editing {
             "type path  Enter:save  Esc:cancel"
         } else {
             "j/k:nav  Enter:toggle/edit  d:clear  Esc:close"
         }
-    } else if app.timeout_popup_open {
+    } else if app.timeout.popup_open {
         "type seconds  Enter:save  Esc:cancel"
-    } else if app.env_import_open {
+    } else if app.env.import.open {
         "type path  Enter:import  Esc:cancel"
-    } else if app.env_popup_open {
+    } else if app.env.popup_open {
         "j/k:nav  Enter:select  a:new  d:del  r:rename  e:vars  i:.env  Esc:close"
-    } else if app.postman_import_open {
+    } else if app.postman_io.open {
         "type path  Enter:import  Esc:cancel"
-    } else if app.curl_export_open {
+    } else if app.curl_io.export_open {
         "Esc:close"
-    } else if app.curl_import_open {
+    } else if app.curl_io.import_open {
         "paste cURL  Ctrl+S:import  Esc:cancel"
-    } else if app.method_popup {
+    } else if app.method_popup.open {
         "j/k:navigate  Enter:select  Esc:cancel"
-    } else if app.history_open {
+    } else if app.history.open {
         "j/k:navigate  Enter:load  Esc:close"
     } else {
-        match app.view {
+        match app.ui.view {
             View::Settings => "j/k:navigate  Space/Enter:toggle  Esc:back",
-            View::Main if app.editing_sidebar_name => "type name  Enter:confirm  Esc:cancel",
-            View::Main if app.editing_url => "type URL  arrows:move  Enter:send  Esc:stop",
-            View::Main if app.editing_body => {
+            View::Main if app.sidebar.editing_name => "type name  Enter:confirm  Esc:cancel",
+            View::Main if app.request.editing_url => "type URL  arrows:move  Enter:send  Esc:stop",
+            View::Main if app.request.editing_body => {
                 "type body  arrows:move  Tab:indent  Enter:newline  Esc:stop"
             }
-            View::Main if app.confirm_delete => "y:confirm delete  any:cancel",
-            View::Main => match app.focus {
+            View::Main if app.sidebar.confirm_delete => "y:confirm delete  any:cancel",
+            View::Main => match app.ui.focus {
                 Focus::Sidebar => {
                     "j/k:nav  a:new  A:folder  d:del  D:dup  r:rename  i:curl  I:postman  q:quit"
                 }
                 Focus::UrlBar => {
                     "e:edit  m:method  A:auth  R:redir  T:tout  S:tls  C:cookies  X:extract  V:assert"
                 }
-                Focus::Body => match app.request_tab {
+                Focus::Body => match app.request.tab {
                     RequestTab::Body => {
-                        if app.body_type == BodyType::Raw {
+                        if app.request.body_type == BodyType::Raw {
                             "1-4:tabs  b:type  c:format  e:edit  Enter:send  q:quit"
                         } else {
                             "1-4:tabs  b:type  j/k:nav  e:edit  a:add  d:del  Enter:send"

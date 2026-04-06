@@ -7,7 +7,7 @@ use super::*;
 use crate::app::{App, Focus, ResponseTab};
 
 pub(super) fn draw_response(frame: &mut Frame, app: &App, area: Rect) {
-    let has_search = app.response_searching || !app.response_search.is_empty();
+    let has_search = app.response.searching || !app.response.search.is_empty();
     let constraints = if has_search {
         vec![
             Constraint::Length(2),
@@ -33,23 +33,23 @@ pub(super) fn draw_response(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_search_bar(frame: &mut Frame, app: &App, area: Rect) {
-    let is_focused = app.focus == Focus::Response;
+    let is_focused = app.ui.focus == Focus::Response;
     let border_style = if is_focused {
         Style::default().fg(GREEN)
     } else {
         Style::default().fg(MUTED)
     };
 
-    let display = if app.response_searching {
-        format!(" /{}\u{2588}", &app.response_search_buf)
+    let display = if app.response.searching {
+        format!(" /{}\u{2588}", &app.response.search_buf)
     } else {
-        format!(" /{}", &app.response_search)
+        format!(" /{}", &app.response.search)
     };
 
     let line = Line::from(vec![
         Span::styled(
             display,
-            Style::default().fg(if app.response_searching { GREEN } else { MUTED }),
+            Style::default().fg(if app.response.searching { GREEN } else { MUTED }),
         ),
         Span::styled("  n:next  N:prev  Esc:clear", Style::default().fg(MUTED)),
     ]);
@@ -65,7 +65,7 @@ fn draw_search_bar(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_response_status_bar(frame: &mut Frame, app: &App, area: Rect) {
-    let status_line = match &app.response {
+    let status_line = match &app.response.last {
         Some(Ok(resp)) => {
             let color = status_color(resp.status);
             let mut spans = vec![
@@ -89,21 +89,21 @@ fn draw_response_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                     )
                 },
                 Span::raw("    "),
-                if app.response_tab == ResponseTab::Body {
+                if app.response.tab == ResponseTab::Body {
                     Span::styled("Body", Style::default().fg(GREEN).bold().underlined())
                 } else {
                     Span::styled("Body", Style::default().fg(MUTED))
                 },
                 Span::raw("  "),
-                if app.response_tab == ResponseTab::Headers {
+                if app.response.tab == ResponseTab::Headers {
                     Span::styled("Headers", Style::default().fg(GREEN).bold().underlined())
                 } else {
                     Span::styled("Headers", Style::default().fg(MUTED))
                 },
             ];
-            if !app.assertion_results.is_empty() {
-                let passed = app.assertion_results.iter().filter(|r| r.passed).count();
-                let total = app.assertion_results.len();
+            if !app.assertions.results.is_empty() {
+                let passed = app.assertions.results.iter().filter(|r| r.passed).count();
+                let total = app.assertions.results.len();
                 let all_ok = passed == total;
                 spans.push(Span::raw("    "));
                 spans.push(Span::styled(
@@ -114,7 +114,7 @@ fn draw_response_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                     Style::default().fg(if all_ok { GREEN } else { RED }).bold(),
                 ));
             }
-            if let Some(msg) = &app.clipboard_msg {
+            if let Some(msg) = &app.response.clipboard_msg {
                 spans.push(Span::raw("    "));
                 spans.push(Span::styled(msg, Style::default().fg(GREEN).bold()));
             }
@@ -124,7 +124,7 @@ fn draw_response_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             " ERROR ",
             Style::default().fg(BG).bg(RED).bold(),
         )]),
-        None if app.loading => Line::from(vec![Span::styled(
+        None if app.response.loading => Line::from(vec![Span::styled(
             " Sending... ",
             Style::default().fg(YELLOW),
         )]),
@@ -135,7 +135,7 @@ fn draw_response_status_bar(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_response_content(frame: &mut Frame, app: &App, area: Rect) {
-    let is_focused = app.focus == Focus::Response;
+    let is_focused = app.ui.focus == Focus::Response;
 
     let block = Block::default()
         .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
@@ -148,8 +148,8 @@ fn draw_response_content(frame: &mut Frame, app: &App, area: Rect) {
 
     let inner = block.inner(area);
 
-    match &app.response {
-        Some(Ok(resp)) if app.response_tab == ResponseTab::Headers => {
+    match &app.response.last {
+        Some(Ok(resp)) if app.response.tab == ResponseTab::Headers => {
             let mut lines: Vec<Line> = Vec::new();
             if !resp.redirect_chain.is_empty() {
                 lines.push(Line::from(Span::styled(
@@ -173,14 +173,14 @@ fn draw_response_content(frame: &mut Frame, app: &App, area: Rect) {
             }));
             let paragraph = Paragraph::new(Text::from(lines))
                 .block(block)
-                .scroll((app.response_scroll, 0));
+                .scroll((app.response.scroll, 0));
             frame.render_widget(paragraph, area);
         }
         Some(Ok(_) | Err(_)) => {
             let body = app.formatted_response_body();
             let is_json = body.starts_with('{') || body.starts_with('[');
 
-            let search = &app.response_search;
+            let search = &app.response.search;
             let lines: Vec<Line> = body
                 .lines()
                 .enumerate()
@@ -207,12 +207,12 @@ fn draw_response_content(frame: &mut Frame, app: &App, area: Rect) {
             let total_lines = lines.len() as u16;
             let paragraph = Paragraph::new(Text::from(lines))
                 .block(block)
-                .scroll((app.response_scroll, 0));
+                .scroll((app.response.scroll, 0));
             frame.render_widget(paragraph, area);
 
             if total_lines > inner.height {
                 let mut scrollbar_state = ScrollbarState::new(total_lines as usize)
-                    .position(app.response_scroll as usize);
+                    .position(app.response.scroll as usize);
                 frame.render_stateful_widget(
                     Scrollbar::new(ScrollbarOrientation::VerticalRight)
                         .thumb_style(Style::default().fg(MUTED)),
@@ -222,7 +222,7 @@ fn draw_response_content(frame: &mut Frame, app: &App, area: Rect) {
             }
         }
         None => {
-            let msg = if app.loading {
+            let msg = if app.response.loading {
                 "Sending request..."
             } else {
                 "Press Enter to send a request"

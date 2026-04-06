@@ -6,17 +6,17 @@ use crate::app::{App, Focus, KvEditorState, RequestTab};
 use crate::collections::Auth;
 
 pub(super) fn draw_url_bar(frame: &mut Frame, app: &App, area: Rect) {
-    let is_focused = app.focus == Focus::UrlBar;
+    let is_focused = app.ui.focus == Focus::UrlBar;
 
-    let method_str = format!(" {} ", app.method.as_str());
-    let color = method_color(&app.method);
+    let method_str = format!(" {} ", app.request.method.as_str());
+    let color = method_color(&app.request.method);
 
-    let line = if app.editing_url {
-        let pos = app.cursor_pos.min(app.url.len());
-        let before = &app.url[..pos];
-        let cursor_ch = app.url[pos..].chars().next().unwrap_or(' ');
-        let after_start = pos + cursor_ch.len_utf8().min(app.url.len() - pos);
-        let after = &app.url[after_start..];
+    let line = if app.request.editing_url {
+        let pos = app.request.cursor_pos.min(app.request.url.len());
+        let before = &app.request.url[..pos];
+        let cursor_ch = app.request.url[pos..].chars().next().unwrap_or(' ');
+        let after_start = pos + cursor_ch.len_utf8().min(app.request.url.len() - pos);
+        let after = &app.request.url[after_start..];
 
         Line::from(vec![
             Span::styled(method_str, Style::default().fg(BG).bg(color).bold()),
@@ -29,7 +29,7 @@ pub(super) fn draw_url_bar(frame: &mut Frame, app: &App, area: Rect) {
         Line::from(vec![
             Span::styled(method_str, Style::default().fg(BG).bg(color).bold()),
             Span::raw(" "),
-            Span::styled(&app.url, Style::default().fg(FG)),
+            Span::styled(&app.request.url, Style::default().fg(FG)),
         ])
     };
 
@@ -38,17 +38,17 @@ pub(super) fn draw_url_bar(frame: &mut Frame, app: &App, area: Rect) {
     } else {
         "  [redirects: off]"
     };
-    let timeout_part = if app.timeout_secs == 30 {
+    let timeout_part = if app.timeout.secs == 30 {
         String::new()
     } else {
-        format!("  [timeout: {}s]", app.timeout_secs)
+        format!("  [timeout: {}s]", app.timeout.secs)
     };
-    let tls_custom = !app.verify_tls
-        || !app.ca_cert_path.is_empty()
-        || !app.client_cert_path.is_empty()
-        || !app.tls_min_version.is_empty();
+    let tls_custom = !app.tls.verify
+        || !app.tls.ca_cert.is_empty()
+        || !app.tls.client_cert.is_empty()
+        || !app.tls.min_version.is_empty();
     let tls_part = if tls_custom {
-        if app.verify_tls {
+        if app.tls.verify {
             "  [tls]"
         } else {
             "  [tls: insecure]"
@@ -80,13 +80,13 @@ pub(super) fn draw_request_panel(frame: &mut Frame, app: &App, area: Rect) {
 
     draw_request_tab_bar(frame, app, layout[0]);
 
-    match app.request_tab {
+    match app.request.tab {
         RequestTab::Body => draw_body_content(frame, app, layout[1]),
         RequestTab::Headers => {
             draw_kv_content(
                 frame,
-                app.focus == Focus::Body,
-                &app.header_editor,
+                app.ui.focus == Focus::Body,
+                &app.request.header_editor,
                 "header",
                 layout[1],
             );
@@ -95,8 +95,8 @@ pub(super) fn draw_request_panel(frame: &mut Frame, app: &App, area: Rect) {
         RequestTab::Params => {
             draw_kv_content(
                 frame,
-                app.focus == Focus::Body,
-                &app.param_editor,
+                app.ui.focus == Focus::Body,
+                &app.request.param_editor,
                 "param",
                 layout[1],
             );
@@ -105,7 +105,7 @@ pub(super) fn draw_request_panel(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_request_tab_bar(frame: &mut Frame, app: &App, area: Rect) {
-    let is_focused = app.focus == Focus::Body;
+    let is_focused = app.ui.focus == Focus::Body;
     let tabs = [
         ("Body", RequestTab::Body),
         ("Headers", RequestTab::Headers),
@@ -119,7 +119,7 @@ fn draw_request_tab_bar(frame: &mut Frame, app: &App, area: Rect) {
         if i > 0 {
             spans.push(Span::raw("  "));
         }
-        let is_active = app.request_tab == *tab;
+        let is_active = app.request.tab == *tab;
         spans.push(Span::styled(
             format!(" {label} "),
             if is_active {
@@ -149,9 +149,9 @@ fn draw_request_tab_bar(frame: &mut Frame, app: &App, area: Rect) {
 fn draw_body_content(frame: &mut Frame, app: &App, area: Rect) {
     use crate::collections::BodyType;
 
-    let is_focused = app.focus == Focus::Body;
+    let is_focused = app.ui.focus == Focus::Body;
 
-    if app.body_type != BodyType::Raw {
+    if app.request.body_type != BodyType::Raw {
         let layout = Layout::default()
             .direction(Direction::Vertical)
             .constraints([Constraint::Length(1), Constraint::Min(1)])
@@ -159,7 +159,10 @@ fn draw_body_content(frame: &mut Frame, app: &App, area: Rect) {
 
         let type_bar = Line::from(vec![
             Span::styled("  Type: ", Style::default().fg(MUTED)),
-            Span::styled(app.body_type.label(), Style::default().fg(ORANGE).bold()),
+            Span::styled(
+                app.request.body_type.label(),
+                Style::default().fg(ORANGE).bold(),
+            ),
             Span::styled("  (b to change)", Style::default().fg(MUTED)),
         ]);
         frame.render_widget(
@@ -175,12 +178,18 @@ fn draw_body_content(frame: &mut Frame, app: &App, area: Rect) {
             layout[0],
         );
 
-        let label = if app.body_type == BodyType::Form {
+        let label = if app.request.body_type == BodyType::Form {
             "field"
         } else {
             "part"
         };
-        draw_kv_content(frame, is_focused, &app.form_editor, label, layout[1]);
+        draw_kv_content(
+            frame,
+            is_focused,
+            &app.request.form_editor,
+            label,
+            layout[1],
+        );
         return;
     }
 
@@ -197,22 +206,29 @@ fn draw_body_content(frame: &mut Frame, app: &App, area: Rect) {
         Span::styled("  Type: ", Style::default().fg(MUTED)),
         Span::styled("Raw", Style::default().fg(ORANGE).bold()),
         Span::styled(" / ", Style::default().fg(MUTED)),
-        Span::styled(app.content_type.label(), Style::default().fg(TEAL).bold()),
+        Span::styled(
+            app.request.content_type.label(),
+            Style::default().fg(TEAL).bold(),
+        ),
         Span::styled("  (b:type  c:format)", Style::default().fg(MUTED)),
     ])];
 
-    if app.body.is_empty() && !app.editing_body {
+    if app.request.body.is_empty() && !app.request.editing_body {
         header_lines.push(Line::from(Span::styled(
             "(empty body)",
             Style::default().fg(MUTED).italic(),
         )));
     } else {
-        let body_str = if app.body.is_empty() { "\n" } else { &app.body };
+        let body_str = if app.request.body.is_empty() {
+            "\n"
+        } else {
+            &app.request.body
+        };
         for (i, line) in body_str.split('\n').enumerate() {
             let num = Span::styled(format!("{:>3} ", i + 1), Style::default().fg(MUTED));
 
-            if app.editing_body && i == app.body_row {
-                let col = app.body_col.min(line.len());
+            if app.request.editing_body && i == app.request.body_row {
+                let col = app.request.body_col.min(line.len());
                 let before = &line[..col];
                 let cursor_ch = line[col..].chars().next().unwrap_or(' ');
                 let after_start = col + cursor_ch.len_utf8().min(line.len() - col);
@@ -358,7 +374,7 @@ fn draw_kv_edit_inline(frame: &mut Frame, editor: &KvEditorState, area: Rect) {
 }
 
 pub(super) fn draw_auth_content(frame: &mut Frame, app: &App, area: Rect) {
-    let is_focused = app.focus == Focus::Body;
+    let is_focused = app.ui.focus == Focus::Body;
 
     let block = Block::default()
         .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
@@ -372,12 +388,12 @@ pub(super) fn draw_auth_content(frame: &mut Frame, app: &App, area: Rect) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    if app.auth_selecting_type {
+    if app.auth.selecting_type {
         draw_auth_type_selector(frame, app, inner);
         return;
     }
 
-    if app.auth_editing {
+    if app.auth.editing {
         draw_auth_fields(frame, app, inner, true);
         return;
     }
@@ -393,7 +409,7 @@ pub(super) fn draw_auth_content(frame: &mut Frame, app: &App, area: Rect) {
     ];
 
     lines.push(Line::default());
-    if app.auth == Auth::None {
+    if app.auth.config == Auth::None {
         lines.push(Line::from(Span::styled(
             "  No authentication configured",
             Style::default().fg(MUTED).italic(),
@@ -421,7 +437,7 @@ fn draw_auth_type_selector(frame: &mut Frame, app: &App, area: Rect) {
             break;
         }
         let row = Rect::new(area.x, y, area.width, 1);
-        let selected = i == app.auth_type_selected;
+        let selected = i == app.auth.type_selected;
         let is_active = i == current;
 
         if selected {
@@ -457,7 +473,7 @@ fn draw_auth_type_selector(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn draw_auth_fields(frame: &mut Frame, app: &App, area: Rect, editing: bool) {
-    let (label_a, label_b) = match &app.auth {
+    let (label_a, label_b) = match &app.auth.config {
         Auth::Bearer { .. } => ("Token:    ", ""),
         Auth::Basic { .. } => ("Username: ", "Password: "),
         Auth::ApiKey { .. } => ("Header:   ", "Value:    "),
@@ -467,15 +483,15 @@ fn draw_auth_fields(frame: &mut Frame, app: &App, area: Rect, editing: bool) {
     let mut lines = vec![Line::default()];
 
     if editing {
-        let style_a = if app.auth_field == 0 {
+        let style_a = if app.auth.field == 0 {
             Style::default().fg(GREEN)
         } else {
             Style::default().fg(FG)
         };
-        let buf_a = if app.auth_field == 0 {
-            format!("{}\u{2588}", &app.auth_buf_a)
+        let buf_a = if app.auth.field == 0 {
+            format!("{}\u{2588}", &app.auth.buf_a)
         } else {
-            app.auth_buf_a.clone()
+            app.auth.buf_a.clone()
         };
         lines.push(Line::from(vec![
             Span::styled(format!("  {label_a}"), Style::default().fg(MUTED)),
@@ -483,15 +499,15 @@ fn draw_auth_fields(frame: &mut Frame, app: &App, area: Rect, editing: bool) {
         ]));
 
         if !label_b.is_empty() {
-            let style_b = if app.auth_field == 1 {
+            let style_b = if app.auth.field == 1 {
                 Style::default().fg(GREEN)
             } else {
                 Style::default().fg(FG)
             };
-            let buf_b = if app.auth_field == 1 {
-                format!("{}\u{2588}", &app.auth_buf_b)
+            let buf_b = if app.auth.field == 1 {
+                format!("{}\u{2588}", &app.auth.buf_b)
             } else {
-                app.auth_buf_b.clone()
+                app.auth.buf_b.clone()
             };
             lines.push(Line::default());
             lines.push(Line::from(vec![
@@ -516,7 +532,7 @@ fn draw_auth_fields(frame: &mut Frame, app: &App, area: Rect, editing: bool) {
 }
 
 fn draw_auth_fields_static<'a>(app: &'a App, lines: &mut Vec<Line<'a>>) {
-    match &app.auth {
+    match &app.auth.config {
         Auth::Bearer { token } => {
             lines.push(Line::from(vec![
                 Span::styled("  Token:    ", Style::default().fg(MUTED)),

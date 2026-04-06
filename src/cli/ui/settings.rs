@@ -25,7 +25,7 @@ pub(super) fn draw_settings(frame: &mut Frame, app: &App) {
             break;
         }
 
-        let selected = i == app.settings_selected;
+        let selected = i == app.ui.settings_selected;
         let row_area = Rect::new(inner.x, y, inner.width, 1);
 
         if selected {
