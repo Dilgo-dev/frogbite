@@ -357,6 +357,129 @@ pub(super) fn draw_env_popup(frame: &mut Frame, app: &App) {
     }
 }
 
+#[allow(clippy::too_many_lines)]
+pub(super) fn draw_extractors_popup(frame: &mut Frame, app: &App) {
+    let area = frame.area();
+    let popup_w = area.width.saturating_sub(6).min(90);
+    let popup_h = area.height.saturating_sub(4).min(22);
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let title = format!(
+        " Response extractors ({}) ",
+        app.extractor_editor.entries.len()
+    );
+    let block = Block::default()
+        .title(title)
+        .title_style(Style::default().fg(TEAL).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(TEAL))
+        .bg(BG);
+
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    if app.extractor_editor.editing {
+        let lines = vec![
+            Line::default(),
+            Line::from(Span::styled(
+                "  Variable name (used as {{name}}):",
+                Style::default().fg(MUTED),
+            )),
+            Line::from(vec![
+                Span::raw("  "),
+                Span::styled(
+                    if app.extractor_editor.edit_field == 0 {
+                        format!("{}\u{2588}", app.extractor_editor.edit_key_buf)
+                    } else {
+                        app.extractor_editor.edit_key_buf.clone()
+                    },
+                    Style::default().fg(if app.extractor_editor.edit_field == 0 {
+                        GREEN
+                    } else {
+                        FG
+                    }),
+                ),
+            ]),
+            Line::default(),
+            Line::from(Span::styled(
+                "  JSONPath (e.g. $.token, data.users[0].id):",
+                Style::default().fg(MUTED),
+            )),
+            Line::from(vec![
+                Span::raw("  "),
+                Span::styled(
+                    if app.extractor_editor.edit_field == 1 {
+                        format!("{}\u{2588}", app.extractor_editor.edit_value_buf)
+                    } else {
+                        app.extractor_editor.edit_value_buf.clone()
+                    },
+                    Style::default().fg(if app.extractor_editor.edit_field == 1 {
+                        GREEN
+                    } else {
+                        FG
+                    }),
+                ),
+            ]),
+            Line::default(),
+            Line::from(Span::styled(
+                "  Tab:switch  Enter:save  Esc:cancel",
+                Style::default().fg(MUTED),
+            )),
+        ];
+        frame.render_widget(Paragraph::new(Text::from(lines)), inner);
+        return;
+    }
+
+    let mut y_pos = inner.y;
+    if app.extractor_editor.entries.is_empty() {
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                "  No extractors. Press a to add one.",
+                Style::default().fg(MUTED).italic(),
+            ))),
+            Rect::new(inner.x, y_pos, inner.width, 1),
+        );
+    } else {
+        for (i, (name, path)) in app.extractor_editor.entries.iter().enumerate() {
+            if y_pos >= inner.y + inner.height - 2 {
+                break;
+            }
+            let row = Rect::new(inner.x, y_pos, inner.width, 1);
+            let selected = i == app.extractor_editor.selected;
+            if selected {
+                frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+            }
+            let preview = app.extracted_vars.get(name).cloned().unwrap_or_default();
+            let line = Line::from(vec![
+                Span::styled(
+                    if selected { " > " } else { "   " },
+                    Style::default().fg(GREEN),
+                ),
+                Span::styled(name, Style::default().fg(ORANGE).bold()),
+                Span::styled("  <- ", Style::default().fg(MUTED)),
+                Span::styled(path, Style::default().fg(TEAL)),
+                Span::styled("   = ", Style::default().fg(MUTED)),
+                Span::styled(preview, Style::default().fg(FG)),
+            ]);
+            frame.render_widget(Paragraph::new(line), row);
+            y_pos += 1;
+        }
+    }
+
+    let footer = Rect::new(inner.x, inner.y + inner.height - 1, inner.width, 1);
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            "  j/k:nav  a:add  e:edit  d:delete  Esc:close",
+            Style::default().fg(MUTED),
+        ))),
+        footer,
+    );
+}
+
 pub(super) fn draw_cookies_popup(frame: &mut Frame, app: &App) {
     let area = frame.area();
     let popup_w = area.width.saturating_sub(6).min(100);

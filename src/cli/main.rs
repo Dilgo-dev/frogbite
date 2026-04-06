@@ -206,6 +206,10 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
         handle_cookies_popup_key(app, key.code);
         return false;
     }
+    if app.extractors_popup_open {
+        handle_extractors_popup_key(app, key.code);
+        return false;
+    }
     if app.env_popup_open {
         handle_env_popup_key(app, key.code);
         return false;
@@ -540,6 +544,28 @@ fn handle_env_var_edit_key(app: &mut App, key: KeyCode) {
     }
 }
 
+fn handle_extractors_popup_key(app: &mut App, key: KeyCode) {
+    if app.extractor_editor.editing {
+        handle_kv_edit_key(&mut app.extractor_editor, key);
+        if !app.extractor_editor.editing {
+            app.sync_to_collection();
+        }
+        return;
+    }
+    match key {
+        KeyCode::Esc | KeyCode::Char('q') => app.extractors_popup_open = false,
+        KeyCode::Char('j') | KeyCode::Down => app.extractor_editor.move_down(),
+        KeyCode::Char('k') | KeyCode::Up => app.extractor_editor.move_up(),
+        KeyCode::Char('a') => app.extractor_editor.start_add(),
+        KeyCode::Char('e') | KeyCode::Enter => app.extractor_editor.start_edit(),
+        KeyCode::Char('d') => {
+            app.extractor_editor.delete_selected();
+            app.sync_to_collection();
+        }
+        _ => {}
+    }
+}
+
 fn handle_cookies_popup_key(app: &mut App, key: KeyCode) {
     match key {
         KeyCode::Esc | KeyCode::Char('q') => app.cookies_popup_open = false,
@@ -763,6 +789,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('T') => app.open_timeout_popup(),
             KeyCode::Char('S') => app.open_tls_popup(),
             KeyCode::Char('C') => app.open_cookies_popup(),
+            KeyCode::Char('X') => app.open_extractors_popup(),
             KeyCode::Enter => app.send_request(),
             KeyCode::Tab => app.focus = Focus::Body,
             KeyCode::BackTab => app.focus = Focus::Sidebar,

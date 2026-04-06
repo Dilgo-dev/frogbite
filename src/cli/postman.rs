@@ -135,6 +135,7 @@ fn process_item(
             client_cert_path: String::new(),
             client_key_path: String::new(),
             tls_min_version: String::new(),
+            extractors: Vec::new(),
         });
     }
 }

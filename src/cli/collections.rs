@@ -122,6 +122,8 @@ pub struct SavedRequest {
     pub client_key_path: String,
     #[serde(default)]
     pub tls_min_version: String,
+    #[serde(default)]
+    pub extractors: Vec<(String, String)>,
 }
 
 pub const fn default_timeout() -> u64 {

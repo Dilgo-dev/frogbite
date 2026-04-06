@@ -196,6 +196,9 @@ pub struct App {
     pub tls_popup_selected: usize,
     pub tls_editing: bool,
     pub tls_edit_buffer: String,
+    pub extractor_editor: KvEditorState,
+    pub extractors_popup_open: bool,
+    pub extracted_vars: HashMap<String, String>,
     pub last_responses: HashMap<String, String>,
     pub cookie_store: CookieStore,
     pub cookies_popup_open: bool,
@@ -309,6 +312,9 @@ impl App {
             tls_popup_selected: 0,
             tls_editing: false,
             tls_edit_buffer: String::new(),
+            extractor_editor: KvEditorState::default(),
+            extractors_popup_open: false,
+            extracted_vars: HashMap::new(),
             last_responses: HashMap::new(),
             cookie_store: cookies::load(),
             cookies_popup_open: false,
@@ -442,6 +448,9 @@ impl App {
             self.client_cert_path.clone_from(&req.client_cert_path);
             self.client_key_path.clone_from(&req.client_key_path);
             self.tls_min_version.clone_from(&req.tls_min_version);
+            self.extractor_editor.entries.clone_from(&req.extractors);
+            self.extractor_editor.selected = 0;
+            self.extractor_editor.editing = false;
             self.form_editor.selected = 0;
             self.form_editor.editing = false;
             self.cursor_pos = self.url.len();
@@ -486,6 +495,7 @@ impl App {
             req.client_cert_path.clone_from(&self.client_cert_path);
             req.client_key_path.clone_from(&self.client_key_path);
             req.tls_min_version.clone_from(&self.tls_min_version);
+            req.extractors.clone_from(&self.extractor_editor.entries);
         }
         self.save_collections();
     }
@@ -641,6 +651,7 @@ impl App {
             client_cert_path: String::new(),
             client_key_path: String::new(),
             tls_min_version: String::new(),
+            extractors: Vec::new(),
         };
 
         let id = req.id.clone();
@@ -693,6 +704,7 @@ impl App {
                 client_cert_path: req.client_cert_path,
                 client_key_path: req.client_key_path,
                 tls_min_version: req.tls_min_version,
+                extractors: req.extractors,
             };
             let id = new_req.id.clone();
             self.requests.push(new_req);
@@ -963,6 +975,7 @@ impl App {
             client_cert_path: String::new(),
             client_key_path: String::new(),
             tls_min_version: String::new(),
+            extractors: Vec::new(),
         };
 
         let id = req.id.clone();
@@ -1390,14 +1403,17 @@ impl App {
     }
 
     fn resolve_variables(&self, input: &str) -> String {
-        let with_chain = self.resolve_chain_refs(input);
+        let mut result = self.resolve_chain_refs(input);
+        for (k, v) in &self.extracted_vars {
+            let pattern = format!("{{{{{k}}}}}");
+            result = result.replace(&pattern, v);
+        }
         let Some(env_id) = &self.active_env_id else {
-            return with_chain;
+            return result;
         };
         let Some(env) = self.environments.iter().find(|e| e.id == *env_id) else {
-            return with_chain;
+            return result;
         };
-        let mut result = with_chain;
         for var in &env.variables {
             let pattern = format!("{{{{{}}}}}", var.key);
             result = result.replace(&pattern, &var.value);
@@ -1613,6 +1629,30 @@ impl App {
         self.sync_to_collection();
     }
 
+    pub const fn open_extractors_popup(&mut self) {
+        self.extractor_editor.editing = false;
+        self.extractor_editor.selected = 0;
+        self.extractors_popup_open = true;
+    }
+
+    fn apply_extractors(&mut self, body: &str) {
+        if self.extractor_editor.entries.is_empty() {
+            return;
+        }
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(body) else {
+            return;
+        };
+        for (name, path) in &self.extractor_editor.entries {
+            let name = name.trim();
+            if name.is_empty() {
+                continue;
+            }
+            if let Some(extracted) = jsonpath_lookup(&value, path.trim()) {
+                self.extracted_vars.insert(name.to_owned(), extracted);
+            }
+        }
+    }
+
     pub fn open_cookies_popup(&mut self) {
         self.cookie_store.purge_expired();
         self.cookies_popup_selected = 0;
@@ -1759,11 +1799,15 @@ impl App {
     }
 
     pub fn poll_pending(&mut self) -> bool {
-        let Some(pending) = &self.pending else {
+        let Some(pending) = self.pending.as_ref() else {
             return false;
         };
-        match pending.rx.try_recv() {
+        let recv = pending.rx.try_recv();
+        match recv {
             Ok(result) => {
+                let Some(pending) = self.pending.take() else {
+                    return false;
+                };
                 if let Ok(resp) = &result {
                     if !resp.set_cookies.is_empty() {
                         self.cookie_store
@@ -1774,6 +1818,8 @@ impl App {
                     if let Some(name) = &pending.request_name {
                         self.last_responses.insert(name.clone(), resp.body.clone());
                     }
+                    let body = resp.body.clone();
+                    self.apply_extractors(&body);
                 }
                 let entry = HistoryEntry {
                     method: pending.method.clone(),
@@ -1788,7 +1834,6 @@ impl App {
                 history::append(entry);
                 self.response = Some(result);
                 self.loading = false;
-                self.pending = None;
                 true
             }
             Err(mpsc::TryRecvError::Empty) => false,
@@ -1832,6 +1877,59 @@ pub enum SidebarItem {
     NewRequest,
 }
 
+/// Resolves a JSONPath-lite expression against a JSON value and returns the
+/// extracted value as a string.
+///
+/// Supports `$` root, `.field` object access, `[N]` array index, and chains
+/// thereof: `$.data.users[0].name`, `data.items[2].id`, `$.token`.
+fn jsonpath_lookup(value: &serde_json::Value, expr: &str) -> Option<String> {
+    let mut expr = expr.trim();
+    if let Some(rest) = expr.strip_prefix('$') {
+        expr = rest;
+    }
+    let expr = expr.trim_start_matches('.');
+
+    let mut current = value;
+    let mut buf = String::new();
+    let mut chars = expr.chars().peekable();
+    while let Some(&c) = chars.peek() {
+        if c == '.' {
+            if !buf.is_empty() {
+                current = current.get(buf.as_str())?;
+                buf.clear();
+            }
+            chars.next();
+        } else if c == '[' {
+            if !buf.is_empty() {
+                current = current.get(buf.as_str())?;
+                buf.clear();
+            }
+            chars.next();
+            let mut idx_str = String::new();
+            while let Some(&c) = chars.peek() {
+                if c == ']' {
+                    chars.next();
+                    break;
+                }
+                idx_str.push(c);
+                chars.next();
+            }
+            let idx: usize = idx_str.trim().parse().ok()?;
+            current = current.get(idx)?;
+        } else {
+            buf.push(c);
+            chars.next();
+        }
+    }
+    if !buf.is_empty() {
+        current = current.get(buf.as_str())?;
+    }
+    Some(match current {
+        serde_json::Value::String(s) => s.clone(),
+        other => other.to_string(),
+    })
+}
+
 fn default_collection() -> CollectionData {
     let folder_id = collections::new_id();
     CollectionData {
@@ -1860,6 +1958,7 @@ fn default_collection() -> CollectionData {
                 client_cert_path: String::new(),
                 client_key_path: String::new(),
                 tls_min_version: String::new(),
+                extractors: Vec::new(),
             },
             SavedRequest {
                 id: collections::new_id(),
@@ -1881,6 +1980,7 @@ fn default_collection() -> CollectionData {
                 client_cert_path: String::new(),
                 client_key_path: String::new(),
                 tls_min_version: String::new(),
+                extractors: Vec::new(),
             },
         ],
         active_request_id: None,
