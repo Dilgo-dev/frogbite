@@ -1558,11 +1558,17 @@ fn copy_to_clipboard(text: &str) -> Result<(), String> {
     use std::io::Write;
     use std::process::{Command, Stdio};
 
-    let commands: &[&[&str]] = &[
-        &["wl-copy"],
-        &["xclip", "-selection", "clipboard"],
-        &["xsel", "--clipboard", "--input"],
-    ];
+    let commands: &[&[&str]] = if cfg!(target_os = "macos") {
+        &[&["pbcopy"]]
+    } else if cfg!(target_os = "windows") {
+        &[&["clip.exe"]]
+    } else {
+        &[
+            &["wl-copy"],
+            &["xclip", "-selection", "clipboard"],
+            &["xsel", "--clipboard", "--input"],
+        ]
+    };
 
     for cmd in commands {
         let Ok(mut child) = Command::new(cmd[0])
