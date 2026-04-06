@@ -124,6 +124,8 @@ pub struct SavedRequest {
     pub tls_min_version: String,
     #[serde(default)]
     pub extractors: Vec<(String, String)>,
+    #[serde(default)]
+    pub assertions: Vec<String>,
 }
 
 pub const fn default_timeout() -> u64 {

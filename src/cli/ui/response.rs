@@ -101,6 +101,19 @@ fn draw_response_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                     Span::styled("Headers", Style::default().fg(MUTED))
                 },
             ];
+            if !app.assertion_results.is_empty() {
+                let passed = app.assertion_results.iter().filter(|r| r.passed).count();
+                let total = app.assertion_results.len();
+                let all_ok = passed == total;
+                spans.push(Span::raw("    "));
+                spans.push(Span::styled(
+                    format!(
+                        "{} {passed}/{total}",
+                        if all_ok { "\u{2713}" } else { "\u{2717}" }
+                    ),
+                    Style::default().fg(if all_ok { GREEN } else { RED }).bold(),
+                ));
+            }
             if let Some(msg) = &app.clipboard_msg {
                 spans.push(Span::raw("    "));
                 spans.push(Span::styled(msg, Style::default().fg(GREEN).bold()));

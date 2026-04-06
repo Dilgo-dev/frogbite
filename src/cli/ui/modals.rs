@@ -358,6 +358,126 @@ pub(super) fn draw_env_popup(frame: &mut Frame, app: &App) {
 }
 
 #[allow(clippy::too_many_lines)]
+pub(super) fn draw_assertions_popup(frame: &mut Frame, app: &App) {
+    let area = frame.area();
+    let popup_w = area.width.saturating_sub(6).min(100);
+    let popup_h = area.height.saturating_sub(4).min(24);
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let passed = app.assertion_results.iter().filter(|r| r.passed).count();
+    let total = app.assertions.len();
+    let title = if app.assertion_results.is_empty() {
+        format!(" Assertions ({total}) ")
+    } else {
+        format!(" Assertions ({passed}/{total} passed) ")
+    };
+
+    let block = Block::default()
+        .title(title)
+        .title_style(Style::default().fg(TEAL).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(TEAL))
+        .bg(BG);
+
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    if app.assertion_editing {
+        let lines = vec![
+            Line::default(),
+            Line::from(Span::styled(
+                "  Examples:",
+                Style::default().fg(MUTED).italic(),
+            )),
+            Line::from(Span::styled(
+                "    status == 200",
+                Style::default().fg(MUTED),
+            )),
+            Line::from(Span::styled(
+                "    body contains \"hello\"",
+                Style::default().fg(MUTED),
+            )),
+            Line::from(Span::styled(
+                "    header Content-Type contains json",
+                Style::default().fg(MUTED),
+            )),
+            Line::from(Span::styled(
+                "    json $.token != \"\"",
+                Style::default().fg(MUTED),
+            )),
+            Line::default(),
+            Line::from(vec![
+                Span::styled("  > ", Style::default().fg(GREEN)),
+                Span::styled(
+                    format!("{}\u{2588}", &app.assertion_edit_buffer),
+                    Style::default().fg(FG),
+                ),
+            ]),
+            Line::default(),
+            Line::from(Span::styled(
+                "  Enter:save  Esc:cancel",
+                Style::default().fg(MUTED),
+            )),
+        ];
+        frame.render_widget(Paragraph::new(Text::from(lines)), inner);
+        return;
+    }
+
+    let mut y_pos = inner.y;
+    if app.assertions.is_empty() {
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                "  No assertions. Press a to add one.",
+                Style::default().fg(MUTED).italic(),
+            ))),
+            Rect::new(inner.x, y_pos, inner.width, 1),
+        );
+    } else {
+        for (i, expr) in app.assertions.iter().enumerate() {
+            if y_pos >= inner.y + inner.height - 2 {
+                break;
+            }
+            let row = Rect::new(inner.x, y_pos, inner.width, 1);
+            let selected = i == app.assertions_selected;
+            if selected {
+                frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+            }
+            let result = app.assertion_results.get(i);
+            let (icon, icon_color, detail) = match result {
+                Some(r) if r.passed => ("\u{2713}", GREEN, r.message.clone()),
+                Some(r) => ("\u{2717}", RED, r.message.clone()),
+                None => ("\u{25cb}", MUTED, "(not yet evaluated)".to_owned()),
+            };
+            let line = Line::from(vec![
+                Span::styled(
+                    if selected { " > " } else { "   " },
+                    Style::default().fg(GREEN),
+                ),
+                Span::styled(format!("{icon} "), Style::default().fg(icon_color).bold()),
+                Span::styled(expr, Style::default().fg(FG)),
+                Span::styled("   ", Style::default()),
+                Span::styled(detail, Style::default().fg(MUTED).italic()),
+            ]);
+            frame.render_widget(Paragraph::new(line), row);
+            y_pos += 1;
+        }
+    }
+
+    let footer = Rect::new(inner.x, inner.y + inner.height - 1, inner.width, 1);
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            "  j/k:nav  a:add  e:edit  d:delete  Esc:close",
+            Style::default().fg(MUTED),
+        ))),
+        footer,
+    );
+}
+
+#[allow(clippy::too_many_lines)]
 pub(super) fn draw_extractors_popup(frame: &mut Frame, app: &App) {
     let area = frame.area();
     let popup_w = area.width.saturating_sub(6).min(90);

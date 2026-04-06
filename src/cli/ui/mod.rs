@@ -105,6 +105,9 @@ fn draw_main(frame: &mut Frame, app: &App) {
     if app.extractors_popup_open {
         modals::draw_extractors_popup(frame, app);
     }
+    if app.assertions_popup_open {
+        modals::draw_assertions_popup(frame, app);
+    }
     if app.env_editor_open {
         modals::draw_env_editor(frame, app);
     }
@@ -128,6 +131,12 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
         "j/k:navigate  Enter/a:edit  d:delete  s:secret  Esc:back"
     } else if app.env_renaming {
         "type name  Enter:confirm  Esc:cancel"
+    } else if app.assertions_popup_open {
+        if app.assertion_editing {
+            "type assertion  Enter:save  Esc:cancel"
+        } else {
+            "j/k:nav  a:add  e:edit  d:delete  Esc:close"
+        }
     } else if app.extractors_popup_open {
         if app.extractor_editor.editing {
             "type name/path  Tab:switch  Enter:save  Esc:cancel"
@@ -172,7 +181,7 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
                     "j/k:nav  a:new  A:folder  d:del  D:dup  r:rename  i:curl  I:postman  q:quit"
                 }
                 Focus::UrlBar => {
-                    "e:edit  m:method  A:auth  R:redir  T:tout  S:tls  C:cookies  X:extract  Enter:send"
+                    "e:edit  m:method  A:auth  R:redir  T:tout  S:tls  C:cookies  X:extract  V:assert"
                 }
                 Focus::Body => match app.request_tab {
                     RequestTab::Body => {

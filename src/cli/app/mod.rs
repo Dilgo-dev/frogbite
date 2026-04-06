@@ -18,6 +18,7 @@ struct PendingRequest {
     request_name: Option<String>,
 }
 
+use crate::assertions::{self, AssertionResult};
 use crate::collections::{self, Auth, BodyType, CollectionData, ContentType, Folder, SavedRequest};
 use crate::cookies::{self, CookieStore};
 use crate::curl;
@@ -199,6 +200,13 @@ pub struct App {
     pub extractor_editor: KvEditorState,
     pub extractors_popup_open: bool,
     pub extracted_vars: HashMap<String, String>,
+    pub assertions: Vec<String>,
+    pub assertion_results: Vec<AssertionResult>,
+    pub assertions_popup_open: bool,
+    pub assertions_selected: usize,
+    pub assertion_editing: bool,
+    pub assertion_edit_buffer: String,
+    pub assertion_editing_existing: bool,
     pub last_responses: HashMap<String, String>,
     pub cookie_store: CookieStore,
     pub cookies_popup_open: bool,
@@ -315,6 +323,13 @@ impl App {
             extractor_editor: KvEditorState::default(),
             extractors_popup_open: false,
             extracted_vars: HashMap::new(),
+            assertions: Vec::new(),
+            assertion_results: Vec::new(),
+            assertions_popup_open: false,
+            assertions_selected: 0,
+            assertion_editing: false,
+            assertion_edit_buffer: String::new(),
+            assertion_editing_existing: false,
             last_responses: HashMap::new(),
             cookie_store: cookies::load(),
             cookies_popup_open: false,
@@ -451,6 +466,9 @@ impl App {
             self.extractor_editor.entries.clone_from(&req.extractors);
             self.extractor_editor.selected = 0;
             self.extractor_editor.editing = false;
+            self.assertions.clone_from(&req.assertions);
+            self.assertion_results.clear();
+            self.assertions_selected = 0;
             self.form_editor.selected = 0;
             self.form_editor.editing = false;
             self.cursor_pos = self.url.len();
@@ -496,6 +514,7 @@ impl App {
             req.client_key_path.clone_from(&self.client_key_path);
             req.tls_min_version.clone_from(&self.tls_min_version);
             req.extractors.clone_from(&self.extractor_editor.entries);
+            req.assertions.clone_from(&self.assertions);
         }
         self.save_collections();
     }
@@ -652,6 +671,7 @@ impl App {
             client_key_path: String::new(),
             tls_min_version: String::new(),
             extractors: Vec::new(),
+            assertions: Vec::new(),
         };
 
         let id = req.id.clone();
@@ -705,6 +725,7 @@ impl App {
                 client_key_path: req.client_key_path,
                 tls_min_version: req.tls_min_version,
                 extractors: req.extractors,
+                assertions: req.assertions,
             };
             let id = new_req.id.clone();
             self.requests.push(new_req);
@@ -976,6 +997,7 @@ impl App {
             client_key_path: String::new(),
             tls_min_version: String::new(),
             extractors: Vec::new(),
+            assertions: Vec::new(),
         };
 
         let id = req.id.clone();
@@ -1629,6 +1651,68 @@ impl App {
         self.sync_to_collection();
     }
 
+    pub const fn open_assertions_popup(&mut self) {
+        self.assertions_popup_open = true;
+        self.assertion_editing = false;
+        self.assertions_selected = 0;
+    }
+
+    pub fn assertions_popup_down(&mut self) {
+        let max = self.assertions.len();
+        if self.assertions_selected < max {
+            self.assertions_selected += 1;
+        }
+    }
+
+    pub const fn assertions_popup_up(&mut self) {
+        if self.assertions_selected > 0 {
+            self.assertions_selected -= 1;
+        }
+    }
+
+    pub fn assertions_start_add(&mut self) {
+        self.assertion_edit_buffer.clear();
+        self.assertion_editing_existing = false;
+        self.assertion_editing = true;
+    }
+
+    pub fn assertions_start_edit(&mut self) {
+        if self.assertions_selected >= self.assertions.len() {
+            self.assertions_start_add();
+            return;
+        }
+        self.assertion_edit_buffer
+            .clone_from(&self.assertions[self.assertions_selected]);
+        self.assertion_editing_existing = true;
+        self.assertion_editing = true;
+    }
+
+    pub fn assertions_confirm_edit(&mut self) {
+        let value = self.assertion_edit_buffer.trim().to_owned();
+        if value.is_empty() {
+            self.assertion_editing = false;
+            return;
+        }
+        if self.assertion_editing_existing && self.assertions_selected < self.assertions.len() {
+            self.assertions[self.assertions_selected] = value;
+        } else {
+            self.assertions.push(value);
+            self.assertions_selected = self.assertions.len() - 1;
+        }
+        self.assertion_editing = false;
+        self.sync_to_collection();
+    }
+
+    pub fn assertions_delete(&mut self) {
+        if self.assertions_selected < self.assertions.len() {
+            self.assertions.remove(self.assertions_selected);
+            if self.assertions_selected > 0 && self.assertions_selected >= self.assertions.len() {
+                self.assertions_selected = self.assertions.len().saturating_sub(1);
+            }
+            self.sync_to_collection();
+        }
+    }
+
     pub const fn open_extractors_popup(&mut self) {
         self.extractor_editor.editing = false;
         self.extractor_editor.selected = 0;
@@ -1820,6 +1904,10 @@ impl App {
                     }
                     let body = resp.body.clone();
                     self.apply_extractors(&body);
+                    self.assertion_results = assertions::evaluate_all(&self.assertions, resp);
+                }
+                if result.is_err() {
+                    self.assertion_results.clear();
                 }
                 let entry = HistoryEntry {
                     method: pending.method.clone(),
@@ -1959,6 +2047,7 @@ fn default_collection() -> CollectionData {
                 client_key_path: String::new(),
                 tls_min_version: String::new(),
                 extractors: Vec::new(),
+                assertions: Vec::new(),
             },
             SavedRequest {
                 id: collections::new_id(),
@@ -1981,6 +2070,7 @@ fn default_collection() -> CollectionData {
                 client_key_path: String::new(),
                 tls_min_version: String::new(),
                 extractors: Vec::new(),
+                assertions: Vec::new(),
             },
         ],
         active_request_id: None,

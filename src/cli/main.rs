@@ -1,4 +1,5 @@
 mod app;
+mod assertions;
 mod collections;
 mod cookies;
 mod curl;
@@ -208,6 +209,10 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
     }
     if app.extractors_popup_open {
         handle_extractors_popup_key(app, key.code);
+        return false;
+    }
+    if app.assertions_popup_open {
+        handle_assertions_popup_key(app, key.code);
         return false;
     }
     if app.env_popup_open {
@@ -544,6 +549,30 @@ fn handle_env_var_edit_key(app: &mut App, key: KeyCode) {
     }
 }
 
+fn handle_assertions_popup_key(app: &mut App, key: KeyCode) {
+    if app.assertion_editing {
+        match key {
+            KeyCode::Esc => app.assertion_editing = false,
+            KeyCode::Enter => app.assertions_confirm_edit(),
+            KeyCode::Backspace => {
+                app.assertion_edit_buffer.pop();
+            }
+            KeyCode::Char(c) => app.assertion_edit_buffer.push(c),
+            _ => {}
+        }
+        return;
+    }
+    match key {
+        KeyCode::Esc | KeyCode::Char('q') => app.assertions_popup_open = false,
+        KeyCode::Char('j') | KeyCode::Down => app.assertions_popup_down(),
+        KeyCode::Char('k') | KeyCode::Up => app.assertions_popup_up(),
+        KeyCode::Char('a') => app.assertions_start_add(),
+        KeyCode::Char('e') | KeyCode::Enter => app.assertions_start_edit(),
+        KeyCode::Char('d') => app.assertions_delete(),
+        _ => {}
+    }
+}
+
 fn handle_extractors_popup_key(app: &mut App, key: KeyCode) {
     if app.extractor_editor.editing {
         handle_kv_edit_key(&mut app.extractor_editor, key);
@@ -790,6 +819,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('S') => app.open_tls_popup(),
             KeyCode::Char('C') => app.open_cookies_popup(),
             KeyCode::Char('X') => app.open_extractors_popup(),
+            KeyCode::Char('V') => app.open_assertions_popup(),
             KeyCode::Enter => app.send_request(),
             KeyCode::Tab => app.focus = Focus::Body,
             KeyCode::BackTab => app.focus = Focus::Sidebar,
