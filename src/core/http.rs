@@ -1,7 +1,9 @@
 use reqwest::blocking::{Client, Response};
-use reqwest::redirect;
+use reqwest::tls::Version;
+use reqwest::{Certificate, Identity, redirect};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fs;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -24,6 +26,16 @@ pub struct RequestOptions {
     pub follow_redirects: bool,
     #[serde(default)]
     pub timeout_secs: u64,
+    #[serde(default)]
+    pub verify_tls: bool,
+    #[serde(default)]
+    pub ca_cert_path: String,
+    #[serde(default)]
+    pub client_cert_path: String,
+    #[serde(default)]
+    pub client_key_path: String,
+    #[serde(default)]
+    pub tls_min_version: String,
 }
 
 /// Parsed HTTP response with status, headers, body and timing.
@@ -39,6 +51,7 @@ pub struct HttpResponse {
 }
 
 /// Sends a blocking HTTP request and returns the parsed response.
+#[allow(clippy::too_many_lines)]
 pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
     let chain: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
 
@@ -62,9 +75,42 @@ pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
     } else {
         opts.timeout_secs
     };
-    let client = Client::builder()
+    let mut builder = Client::builder()
         .timeout(Duration::from_secs(timeout_secs))
-        .redirect(policy)
+        .redirect(policy);
+
+    if !opts.verify_tls {
+        builder = builder.danger_accept_invalid_certs(true);
+    }
+
+    if !opts.ca_cert_path.is_empty() {
+        let pem = fs::read(&opts.ca_cert_path)
+            .map_err(|e| format!("CA cert read failed ({}): {e}", opts.ca_cert_path))?;
+        let cert = Certificate::from_pem(&pem).map_err(|e| format!("CA cert parse failed: {e}"))?;
+        builder = builder.add_root_certificate(cert);
+    }
+
+    if !opts.client_cert_path.is_empty() {
+        let mut combined = fs::read(&opts.client_cert_path)
+            .map_err(|e| format!("Client cert read failed ({}): {e}", opts.client_cert_path))?;
+        if !opts.client_key_path.is_empty() {
+            let mut key = fs::read(&opts.client_key_path)
+                .map_err(|e| format!("Client key read failed ({}): {e}", opts.client_key_path))?;
+            combined.push(b'\n');
+            combined.append(&mut key);
+        }
+        let id = Identity::from_pem(&combined)
+            .map_err(|e| format!("Client identity parse failed: {e}"))?;
+        builder = builder.identity(id);
+    }
+
+    match opts.tls_min_version.as_str() {
+        "1.2" => builder = builder.min_tls_version(Version::TLS_1_2),
+        "1.3" => builder = builder.min_tls_version(Version::TLS_1_3),
+        _ => {}
+    }
+
+    let client = builder
         .build()
         .map_err(|e| format!("Failed to create client: {e}"))?;
 

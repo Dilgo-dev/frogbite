@@ -43,7 +43,20 @@ pub(super) fn draw_url_bar(frame: &mut Frame, app: &App, area: Rect) {
     } else {
         format!("  [timeout: {}s]", app.timeout_secs)
     };
-    let title = format!(" Request{redirects_part}{timeout_part} ");
+    let tls_custom = !app.verify_tls
+        || !app.ca_cert_path.is_empty()
+        || !app.client_cert_path.is_empty()
+        || !app.tls_min_version.is_empty();
+    let tls_part = if tls_custom {
+        if app.verify_tls {
+            "  [tls]"
+        } else {
+            "  [tls: insecure]"
+        }
+    } else {
+        ""
+    };
+    let title = format!(" Request{redirects_part}{timeout_part}{tls_part} ");
     let block = Block::default()
         .title(title)
         .title_style(Style::default().fg(MUTED))

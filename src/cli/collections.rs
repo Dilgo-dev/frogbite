@@ -112,6 +112,16 @@ pub struct SavedRequest {
     pub follow_redirects: bool,
     #[serde(default = "default_timeout")]
     pub timeout_secs: u64,
+    #[serde(default = "default_true")]
+    pub verify_tls: bool,
+    #[serde(default)]
+    pub ca_cert_path: String,
+    #[serde(default)]
+    pub client_cert_path: String,
+    #[serde(default)]
+    pub client_key_path: String,
+    #[serde(default)]
+    pub tls_min_version: String,
 }
 
 pub const fn default_timeout() -> u64 {

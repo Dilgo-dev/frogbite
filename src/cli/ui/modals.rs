@@ -357,6 +357,98 @@ pub(super) fn draw_env_popup(frame: &mut Frame, app: &App) {
     }
 }
 
+pub(super) fn draw_tls_popup(frame: &mut Frame, app: &App) {
+    let area = frame.area();
+    let popup_w = area.width.saturating_sub(8).min(80);
+    let popup_h: u16 = 14;
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .title(" TLS / Certificates ")
+        .title_style(Style::default().fg(TEAL).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(TEAL))
+        .bg(BG);
+
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    let min_label = if app.tls_min_version.is_empty() {
+        "auto".to_owned()
+    } else {
+        format!("TLS {}", app.tls_min_version)
+    };
+
+    let fields: [(&str, String); 5] = [
+        (
+            "Verify TLS",
+            if app.verify_tls {
+                "on"
+            } else {
+                "off (insecure)"
+            }
+            .to_owned(),
+        ),
+        ("CA cert", display_or_none(&app.ca_cert_path)),
+        ("Client cert", display_or_none(&app.client_cert_path)),
+        ("Client key", display_or_none(&app.client_key_path)),
+        ("Min TLS version", min_label),
+    ];
+
+    let mut lines: Vec<Line> = Vec::new();
+    lines.push(Line::default());
+    for (i, (label, value)) in fields.iter().enumerate() {
+        let selected = i == app.tls_popup_selected;
+        let marker = if selected { " > " } else { "   " };
+        let value_style = if selected {
+            Style::default().fg(FG)
+        } else {
+            Style::default().fg(MUTED)
+        };
+        lines.push(Line::from(vec![
+            Span::styled(marker, Style::default().fg(GREEN)),
+            Span::styled(format!("{label:<18}"), Style::default().fg(TEAL).bold()),
+            Span::styled(value.clone(), value_style),
+        ]));
+    }
+
+    lines.push(Line::default());
+    if app.tls_editing {
+        lines.push(Line::from(vec![
+            Span::styled("   path: ", Style::default().fg(MUTED)),
+            Span::styled(
+                format!("{}\u{2588}", &app.tls_edit_buffer),
+                Style::default().fg(GREEN),
+            ),
+        ]));
+        lines.push(Line::default());
+        lines.push(Line::from(Span::styled(
+            "   Enter:save  Esc:cancel",
+            Style::default().fg(MUTED),
+        )));
+    } else {
+        lines.push(Line::from(Span::styled(
+            "   j/k:nav  Enter/Space:toggle/edit  d:clear  Esc:close",
+            Style::default().fg(MUTED),
+        )));
+    }
+
+    let paragraph = Paragraph::new(Text::from(lines));
+    frame.render_widget(paragraph, inner);
+}
+
+fn display_or_none(s: &str) -> String {
+    if s.is_empty() {
+        "(none)".to_owned()
+    } else {
+        s.to_owned()
+    }
+}
+
 pub(super) fn draw_timeout_popup(frame: &mut Frame, app: &App) {
     let area = frame.area();
     let popup_w = area.width.saturating_sub(10).min(50);

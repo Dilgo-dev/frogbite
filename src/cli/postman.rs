@@ -130,6 +130,11 @@ fn process_item(
             form_data: Vec::new(),
             follow_redirects: true,
             timeout_secs: collections::default_timeout(),
+            verify_tls: true,
+            ca_cert_path: String::new(),
+            client_cert_path: String::new(),
+            client_key_path: String::new(),
+            tls_min_version: String::new(),
         });
     }
 }

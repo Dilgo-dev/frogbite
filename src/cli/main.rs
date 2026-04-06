@@ -197,6 +197,10 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
         handle_timeout_popup_key(app, key.code);
         return false;
     }
+    if app.tls_popup_open {
+        handle_tls_popup_key(app, key.code);
+        return false;
+    }
     if app.env_popup_open {
         handle_env_popup_key(app, key.code);
         return false;
@@ -531,6 +535,32 @@ fn handle_env_var_edit_key(app: &mut App, key: KeyCode) {
     }
 }
 
+fn handle_tls_popup_key(app: &mut App, key: KeyCode) {
+    if app.tls_editing {
+        match key {
+            KeyCode::Esc => {
+                app.tls_editing = false;
+                app.tls_edit_buffer.clear();
+            }
+            KeyCode::Enter => app.tls_confirm_edit(),
+            KeyCode::Backspace => {
+                app.tls_edit_buffer.pop();
+            }
+            KeyCode::Char(c) => app.tls_edit_buffer.push(c),
+            _ => {}
+        }
+        return;
+    }
+    match key {
+        KeyCode::Esc => app.tls_popup_open = false,
+        KeyCode::Char('j') | KeyCode::Down => app.tls_popup_down(),
+        KeyCode::Char('k') | KeyCode::Up => app.tls_popup_up(),
+        KeyCode::Enter | KeyCode::Char(' ' | 'e') => app.tls_popup_activate(),
+        KeyCode::Char('d') => app.tls_popup_clear_field(),
+        _ => {}
+    }
+}
+
 fn handle_timeout_popup_key(app: &mut App, key: KeyCode) {
     match key {
         KeyCode::Esc => app.timeout_popup_open = false,
@@ -715,6 +745,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('m') => app.open_method_popup(),
             KeyCode::Char('R') => app.toggle_follow_redirects(),
             KeyCode::Char('T') => app.open_timeout_popup(),
+            KeyCode::Char('S') => app.open_tls_popup(),
             KeyCode::Enter => app.send_request(),
             KeyCode::Tab => app.focus = Focus::Body,
             KeyCode::BackTab => app.focus = Focus::Sidebar,

@@ -184,6 +184,15 @@ pub struct App {
     pub timeout_popup_open: bool,
     pub timeout_buffer: String,
     pub timeout_error: bool,
+    pub verify_tls: bool,
+    pub ca_cert_path: String,
+    pub client_cert_path: String,
+    pub client_key_path: String,
+    pub tls_min_version: String,
+    pub tls_popup_open: bool,
+    pub tls_popup_selected: usize,
+    pub tls_editing: bool,
+    pub tls_edit_buffer: String,
     pending: Option<PendingRequest>,
 }
 
@@ -284,6 +293,15 @@ impl App {
             timeout_popup_open: false,
             timeout_buffer: String::new(),
             timeout_error: false,
+            verify_tls: true,
+            ca_cert_path: String::new(),
+            client_cert_path: String::new(),
+            client_key_path: String::new(),
+            tls_min_version: String::new(),
+            tls_popup_open: false,
+            tls_popup_selected: 0,
+            tls_editing: false,
+            tls_edit_buffer: String::new(),
             pending: None,
         };
 
@@ -408,6 +426,11 @@ impl App {
             self.form_editor.entries = req.form_data.clone();
             self.follow_redirects = req.follow_redirects;
             self.timeout_secs = req.timeout_secs;
+            self.verify_tls = req.verify_tls;
+            self.ca_cert_path.clone_from(&req.ca_cert_path);
+            self.client_cert_path.clone_from(&req.client_cert_path);
+            self.client_key_path.clone_from(&req.client_key_path);
+            self.tls_min_version.clone_from(&req.tls_min_version);
             self.form_editor.selected = 0;
             self.form_editor.editing = false;
             self.cursor_pos = self.url.len();
@@ -447,6 +470,11 @@ impl App {
             req.form_data.clone_from(&self.form_editor.entries);
             req.follow_redirects = self.follow_redirects;
             req.timeout_secs = self.timeout_secs;
+            req.verify_tls = self.verify_tls;
+            req.ca_cert_path.clone_from(&self.ca_cert_path);
+            req.client_cert_path.clone_from(&self.client_cert_path);
+            req.client_key_path.clone_from(&self.client_key_path);
+            req.tls_min_version.clone_from(&self.tls_min_version);
         }
         self.save_collections();
     }
@@ -597,6 +625,11 @@ impl App {
             form_data: Vec::new(),
             follow_redirects: true,
             timeout_secs: collections::default_timeout(),
+            verify_tls: true,
+            ca_cert_path: String::new(),
+            client_cert_path: String::new(),
+            client_key_path: String::new(),
+            tls_min_version: String::new(),
         };
 
         let id = req.id.clone();
@@ -644,6 +677,11 @@ impl App {
                 form_data: req.form_data,
                 follow_redirects: req.follow_redirects,
                 timeout_secs: req.timeout_secs,
+                verify_tls: req.verify_tls,
+                ca_cert_path: req.ca_cert_path,
+                client_cert_path: req.client_cert_path,
+                client_key_path: req.client_key_path,
+                tls_min_version: req.tls_min_version,
             };
             let id = new_req.id.clone();
             self.requests.push(new_req);
@@ -909,6 +947,11 @@ impl App {
             form_data: Vec::new(),
             follow_redirects: true,
             timeout_secs: collections::default_timeout(),
+            verify_tls: true,
+            ca_cert_path: String::new(),
+            client_cert_path: String::new(),
+            client_key_path: String::new(),
+            tls_min_version: String::new(),
         };
 
         let id = req.id.clone();
@@ -1438,6 +1481,75 @@ impl App {
         }
     }
 
+    pub const TLS_FIELDS: usize = 5;
+
+    pub fn open_tls_popup(&mut self) {
+        self.tls_popup_selected = 0;
+        self.tls_editing = false;
+        self.tls_edit_buffer.clear();
+        self.tls_popup_open = true;
+    }
+
+    pub const fn tls_popup_down(&mut self) {
+        if self.tls_popup_selected + 1 < Self::TLS_FIELDS {
+            self.tls_popup_selected += 1;
+        }
+    }
+
+    pub const fn tls_popup_up(&mut self) {
+        if self.tls_popup_selected > 0 {
+            self.tls_popup_selected -= 1;
+        }
+    }
+
+    pub fn tls_popup_activate(&mut self) {
+        match self.tls_popup_selected {
+            0 => {
+                self.verify_tls = !self.verify_tls;
+                self.sync_to_collection();
+            }
+            4 => {
+                self.tls_min_version = match self.tls_min_version.as_str() {
+                    "" => "1.2".to_owned(),
+                    "1.2" => "1.3".to_owned(),
+                    _ => String::new(),
+                };
+                self.sync_to_collection();
+            }
+            n => {
+                self.tls_edit_buffer = match n {
+                    1 => self.ca_cert_path.clone(),
+                    2 => self.client_cert_path.clone(),
+                    3 => self.client_key_path.clone(),
+                    _ => String::new(),
+                };
+                self.tls_editing = true;
+            }
+        }
+    }
+
+    pub fn tls_popup_clear_field(&mut self) {
+        match self.tls_popup_selected {
+            1 => self.ca_cert_path.clear(),
+            2 => self.client_cert_path.clear(),
+            3 => self.client_key_path.clear(),
+            _ => return,
+        }
+        self.sync_to_collection();
+    }
+
+    pub fn tls_confirm_edit(&mut self) {
+        let val = self.tls_edit_buffer.trim().to_owned();
+        match self.tls_popup_selected {
+            1 => self.ca_cert_path = val,
+            2 => self.client_cert_path = val,
+            3 => self.client_key_path = val,
+            _ => {}
+        }
+        self.tls_editing = false;
+        self.sync_to_collection();
+    }
+
     pub fn toggle_follow_redirects(&mut self) {
         self.follow_redirects = !self.follow_redirects;
         self.sync_to_collection();
@@ -1507,6 +1619,11 @@ impl App {
             body,
             follow_redirects: self.follow_redirects,
             timeout_secs: self.timeout_secs,
+            verify_tls: self.verify_tls,
+            ca_cert_path: self.ca_cert_path.clone(),
+            client_cert_path: self.client_cert_path.clone(),
+            client_key_path: self.client_key_path.clone(),
+            tls_min_version: self.tls_min_version.clone(),
         };
 
         let (tx, rx) = mpsc::channel();
@@ -1609,6 +1726,11 @@ fn default_collection() -> CollectionData {
                 form_data: Vec::new(),
                 follow_redirects: true,
                 timeout_secs: collections::default_timeout(),
+                verify_tls: true,
+                ca_cert_path: String::new(),
+                client_cert_path: String::new(),
+                client_key_path: String::new(),
+                tls_min_version: String::new(),
             },
             SavedRequest {
                 id: collections::new_id(),
@@ -1625,6 +1747,11 @@ fn default_collection() -> CollectionData {
                 form_data: Vec::new(),
                 follow_redirects: true,
                 timeout_secs: collections::default_timeout(),
+                verify_tls: true,
+                ca_cert_path: String::new(),
+                client_cert_path: String::new(),
+                client_key_path: String::new(),
+                tls_min_version: String::new(),
             },
         ],
         active_request_id: None,
