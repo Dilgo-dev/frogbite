@@ -1,3 +1,9 @@
+mod clipboard;
+mod kv_editor;
+mod url_utils;
+
+pub use kv_editor::KvEditorState;
+
 use std::collections::HashMap;
 
 use frogbite::core::http::{HttpResponse, RequestOptions};
@@ -90,83 +96,6 @@ pub enum RequestTab {
     Headers,
     Auth,
     Params,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct KvEditorState {
-    pub entries: Vec<(String, String)>,
-    pub selected: usize,
-    pub editing: bool,
-    pub edit_field: usize,
-    pub edit_key_buf: String,
-    pub edit_value_buf: String,
-    pub editing_existing: bool,
-}
-
-impl KvEditorState {
-    pub fn count(&self) -> usize {
-        self.entries.len() + 1
-    }
-
-    pub fn move_down(&mut self) {
-        let max = self.count().saturating_sub(1);
-        if self.selected < max {
-            self.selected += 1;
-        }
-    }
-
-    pub const fn move_up(&mut self) {
-        self.selected = self.selected.saturating_sub(1);
-    }
-
-    pub fn start_add(&mut self) {
-        self.edit_key_buf.clear();
-        self.edit_value_buf.clear();
-        self.edit_field = 0;
-        self.editing_existing = false;
-        self.editing = true;
-    }
-
-    pub fn start_edit(&mut self) {
-        if self.selected >= self.entries.len() {
-            self.start_add();
-            return;
-        }
-        let (k, v) = &self.entries[self.selected];
-        self.edit_key_buf = k.clone();
-        self.edit_value_buf = v.clone();
-        self.edit_field = 0;
-        self.editing_existing = true;
-        self.editing = true;
-    }
-
-    pub fn confirm_edit(&mut self) {
-        if self.edit_key_buf.trim().is_empty() {
-            self.editing = false;
-            return;
-        }
-        if self.editing_existing && self.selected < self.entries.len() {
-            self.entries[self.selected] = (self.edit_key_buf.clone(), self.edit_value_buf.clone());
-        } else {
-            self.entries
-                .push((self.edit_key_buf.clone(), self.edit_value_buf.clone()));
-            self.selected = self.entries.len().saturating_sub(1);
-        }
-        self.editing = false;
-    }
-
-    pub const fn cancel_edit(&mut self) {
-        self.editing = false;
-    }
-
-    pub fn delete_selected(&mut self) {
-        if self.selected < self.entries.len() {
-            self.entries.remove(self.selected);
-            if self.selected > 0 && self.selected >= self.entries.len() {
-                self.selected = self.entries.len().saturating_sub(1);
-            }
-        }
-    }
 }
 
 #[allow(clippy::struct_excessive_bools)]
@@ -531,8 +460,11 @@ impl App {
                 continue;
             }
             let (key, value) = match pair.split_once('=') {
-                Some((k, v)) => (simple_url_decode(k), simple_url_decode(v)),
-                None => (simple_url_decode(pair), String::new()),
+                Some((k, v)) => (
+                    url_utils::simple_url_decode(k),
+                    url_utils::simple_url_decode(v),
+                ),
+                None => (url_utils::simple_url_decode(pair), String::new()),
             };
             self.param_editor.entries.push((key, value));
         }
@@ -548,7 +480,13 @@ impl App {
                 .param_editor
                 .entries
                 .iter()
-                .map(|(k, v)| format!("{}={}", simple_url_encode(k), simple_url_encode(v)))
+                .map(|(k, v)| {
+                    format!(
+                        "{}={}",
+                        url_utils::simple_url_encode(k),
+                        url_utils::simple_url_encode(v)
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join("&");
             self.url = format!("{base}?{query}");
@@ -927,7 +865,7 @@ impl App {
             Some(SidebarItem::NewRequest) | None => None,
         };
 
-        let name = name_from_url(&parsed.url);
+        let name = url_utils::name_from_url(&parsed.url);
         let req = SavedRequest {
             id: collections::new_id(),
             name,
@@ -1547,48 +1485,11 @@ impl App {
             self.clipboard_msg = Some("Nothing to copy".to_owned());
             return;
         }
-        match copy_to_clipboard(&text) {
+        match clipboard::copy_to_clipboard(&text) {
             Ok(()) => self.clipboard_msg = Some("Copied to clipboard".to_owned()),
             Err(e) => self.clipboard_msg = Some(e),
         }
     }
-}
-
-fn copy_to_clipboard(text: &str) -> Result<(), String> {
-    use std::io::Write;
-    use std::process::{Command, Stdio};
-
-    let commands: &[&[&str]] = if cfg!(target_os = "macos") {
-        &[&["pbcopy"]]
-    } else if cfg!(target_os = "windows") {
-        &[&["clip.exe"]]
-    } else {
-        &[
-            &["wl-copy"],
-            &["xclip", "-selection", "clipboard"],
-            &["xsel", "--clipboard", "--input"],
-        ]
-    };
-
-    for cmd in commands {
-        let Ok(mut child) = Command::new(cmd[0])
-            .args(&cmd[1..])
-            .stdin(Stdio::piped())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-        else {
-            continue;
-        };
-        if let Some(stdin) = child.stdin.as_mut() {
-            let _ = stdin.write_all(text.as_bytes());
-        }
-        if child.wait().is_ok() {
-            return Ok(());
-        }
-    }
-
-    Err("No clipboard tool found (wl-copy, xclip, xsel)".to_owned())
 }
 
 #[derive(Debug, Clone)]
@@ -1596,20 +1497,6 @@ pub enum SidebarItem {
     Folder(Folder),
     Request(Box<SavedRequest>),
     NewRequest,
-}
-
-fn name_from_url(url: &str) -> String {
-    let without_scheme = url
-        .strip_prefix("https://")
-        .or_else(|| url.strip_prefix("http://"))
-        .unwrap_or(url);
-    let path = without_scheme.split('?').next().unwrap_or(without_scheme);
-    let last_segment = path.rsplit('/').find(|s| !s.is_empty()).unwrap_or(path);
-    if last_segment.is_empty() || last_segment.len() > 20 {
-        "Imported Request".to_owned()
-    } else {
-        last_segment.to_owned()
-    }
 }
 
 fn default_collection() -> CollectionData {
@@ -1650,56 +1537,5 @@ fn default_collection() -> CollectionData {
             },
         ],
         active_request_id: None,
-    }
-}
-
-fn simple_url_encode(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for b in s.bytes() {
-        match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(b as char);
-            }
-            b' ' => out.push_str("%20"),
-            _ => {
-                out.push('%');
-                out.push(char::from(b"0123456789ABCDEF"[(b >> 4) as usize]));
-                out.push(char::from(b"0123456789ABCDEF"[(b & 0xF) as usize]));
-            }
-        }
-    }
-    out
-}
-
-fn simple_url_decode(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    let bytes = s.as_bytes();
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'%' && i + 2 < bytes.len() {
-            let hi = hex_val(bytes[i + 1]);
-            let lo = hex_val(bytes[i + 2]);
-            if let (Some(h), Some(l)) = (hi, lo) {
-                out.push((h << 4 | l) as char);
-                i += 3;
-                continue;
-            }
-        }
-        if bytes[i] == b'+' {
-            out.push(' ');
-        } else {
-            out.push(bytes[i] as char);
-        }
-        i += 1;
-    }
-    out
-}
-
-const fn hex_val(b: u8) -> Option<u8> {
-    match b {
-        b'0'..=b'9' => Some(b - b'0'),
-        b'A'..=b'F' => Some(b - b'A' + 10),
-        b'a'..=b'f' => Some(b - b'a' + 10),
-        _ => None,
     }
 }
