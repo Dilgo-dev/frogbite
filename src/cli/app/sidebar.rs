@@ -84,6 +84,10 @@ impl App {
                 "Theme (restart to apply)",
                 SettingDisplay::Choice(self.ui.settings.theme.clone()),
             ),
+            (
+                "WS auto-reconnect",
+                SettingDisplay::Toggle(self.ui.settings.ws_auto_reconnect),
+            ),
         ]
     }
 
@@ -103,6 +107,9 @@ impl App {
                     .unwrap_or(0);
                 let next = (idx + 1) % names.len();
                 names[next].clone_into(&mut self.ui.settings.theme);
+            }
+            4 => {
+                self.ui.settings.ws_auto_reconnect = !self.ui.settings.ws_auto_reconnect;
             }
             _ => {}
         }

@@ -28,7 +28,7 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
         WsStatus::Connected => (" CONNECTED ", green()),
         WsStatus::Closed => (" CLOSED ", muted()),
     };
-    let line = Line::from(vec![
+    let mut spans = vec![
         Span::styled(label, Style::default().fg(bg()).bg(color).bold()),
         Span::raw("  "),
         Span::styled("WS", Style::default().fg(teal()).bold()),
@@ -47,8 +47,15 @@ fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             format!("view:{}", app.ws.view_format.label()),
             Style::default().fg(teal()).bold(),
         ),
-    ]);
-    frame.render_widget(Paragraph::new(line).bg(surface()), area);
+    ];
+    if app.ui.settings.ws_auto_reconnect {
+        spans.push(Span::raw("  "));
+        spans.push(Span::styled(
+            "reconnect:on",
+            Style::default().fg(yellow()).bold(),
+        ));
+    }
+    frame.render_widget(Paragraph::new(Line::from(spans)).bg(surface()), area);
 }
 
 fn draw_stream(frame: &mut Frame, app: &App, area: Rect) {

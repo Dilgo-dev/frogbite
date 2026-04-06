@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Instant;
 
 use frogbite::core::ws::{self, WsEvent, WsHandle};
 
@@ -108,6 +109,8 @@ pub struct WsMessage {
     pub data: Option<Vec<u8>>,
 }
 
+const MAX_RECONNECT_DELAY_SECS: u64 = 16;
+
 #[derive(Default)]
 pub struct WsState {
     pub status: WsStatus,
@@ -121,6 +124,10 @@ pub struct WsState {
     pub upload_popup_open: bool,
     pub upload_buffer: String,
     pub upload_error: Option<String>,
+    pub reconnect_attempts: u32,
+    pub reconnect_at: Option<Instant>,
+    last_url: Option<String>,
+    last_headers: Option<HashMap<String, String>>,
 }
 
 impl WsState {
@@ -170,12 +177,18 @@ impl App {
         self.ws.messages.clear();
         self.ws.scroll = 0;
         self.ws.status = WsStatus::Connecting;
+        self.ws.reconnect_attempts = 0;
+        self.ws.reconnect_at = None;
+        self.ws.last_url = Some(url.clone());
+        self.ws.last_headers = Some(headers.clone());
         self.ws
             .push(WsDirection::Info, format!("connecting to {url}"));
         self.ws.handle = Some(ws::connect(url, headers));
     }
 
-    pub fn ws_disconnect(&self) {
+    pub fn ws_disconnect(&mut self) {
+        self.ws.reconnect_at = None;
+        self.ws.reconnect_attempts = 0;
         if let Some(handle) = &self.ws.handle {
             handle.close();
         }
@@ -282,18 +295,23 @@ impl App {
         self.ws.input.clear();
         self.ws.input_editing = false;
         self.ws.scroll = 0;
+        self.ws.reconnect_at = None;
+        self.ws.reconnect_attempts = 0;
     }
 
     pub fn poll_ws(&mut self) {
         if self.ws.handle.is_none() {
             return;
         }
+        let mut closed = false;
         loop {
             let recv = self.ws.handle.as_ref().map(|h| h.event_rx.try_recv());
             let Some(recv) = recv else { break };
             match recv {
                 Ok(WsEvent::Connected) => {
                     self.ws.status = WsStatus::Connected;
+                    self.ws.reconnect_attempts = 0;
+                    self.ws.reconnect_at = None;
                     self.ws.push(WsDirection::Info, "connected".to_owned());
                 }
                 Ok(WsEvent::Message(text)) => {
@@ -325,15 +343,52 @@ impl App {
                     self.ws.status = WsStatus::Closed;
                     self.ws.push(WsDirection::Info, "closed".to_owned());
                     self.ws.handle = None;
+                    closed = true;
                     break;
                 }
                 Err(std::sync::mpsc::TryRecvError::Empty) => break,
                 Err(std::sync::mpsc::TryRecvError::Disconnected) => {
                     self.ws.status = WsStatus::Closed;
                     self.ws.handle = None;
+                    closed = true;
                     break;
                 }
             }
         }
+        if closed {
+            self.ws_schedule_reconnect();
+        }
+    }
+
+    fn ws_schedule_reconnect(&mut self) {
+        if !self.ui.settings.ws_auto_reconnect {
+            return;
+        }
+        if self.ws.last_url.is_none() {
+            return;
+        }
+        let delay_secs = (1u64 << self.ws.reconnect_attempts.min(4)).min(MAX_RECONNECT_DELAY_SECS);
+        self.ws.reconnect_at = Some(Instant::now() + std::time::Duration::from_secs(delay_secs));
+        self.ws
+            .push(WsDirection::Info, format!("reconnecting in {delay_secs}s"));
+    }
+
+    pub fn ws_try_reconnect(&mut self) {
+        let Some(deadline) = self.ws.reconnect_at else {
+            return;
+        };
+        if Instant::now() < deadline {
+            return;
+        }
+        self.ws.reconnect_at = None;
+        let Some(url) = self.ws.last_url.clone() else {
+            return;
+        };
+        let headers = self.ws.last_headers.clone().unwrap_or_default();
+        self.ws.reconnect_attempts += 1;
+        self.ws.status = WsStatus::Connecting;
+        self.ws
+            .push(WsDirection::Info, format!("reconnecting to {url}"));
+        self.ws.handle = Some(ws::connect(url, headers));
     }
 }

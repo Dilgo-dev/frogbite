@@ -3,6 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 
 /// User preferences persisted in ~/.config/frogbite/settings.json.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Settings {
     pub splash_animation: bool,
@@ -11,6 +12,8 @@ pub struct Settings {
     pub update_check: bool,
     #[serde(default = "default_theme")]
     pub theme: String,
+    #[serde(default)]
+    pub ws_auto_reconnect: bool,
 }
 
 const fn default_true() -> bool {
@@ -28,6 +31,7 @@ impl Default for Settings {
             vim_keys: true,
             update_check: true,
             theme: default_theme(),
+            ws_auto_reconnect: false,
         }
     }
 }

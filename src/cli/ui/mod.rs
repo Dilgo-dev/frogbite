@@ -187,7 +187,7 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
     } else if app.ws.upload_popup_open {
         "type path  Enter:send  Esc:cancel"
     } else if app.ws_active() && app.ui.focus == Focus::Response {
-        "i:type  b:fmt  u:upload  Enter:send  d:disc  c:clr  x:close  j/k:scroll"
+        "i:type  b:fmt  u:upload  d:disc  R:reconnect  c:clr  x:close  j/k:scroll"
     } else if app.response.searching {
         "type search term  Enter:search  Esc:cancel"
     } else if app.auth.editing {

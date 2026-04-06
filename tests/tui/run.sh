@@ -191,4 +191,45 @@ test_ws_panel() {
 }
 run_test "ws / panel activates for ws:// URL" test_ws_panel
 
+# ────────────────────────────────────────────────────────────────────
+# 11 / ws auto-reconnect toggle shows indicator and schedules retry
+# ────────────────────────────────────────────────────────────────────
+test_ws_auto_reconnect() {
+  local s
+  s=$(frog_start ws_reconnect) || return 1
+  frog_send "$s" Tab
+  frog_send "$s" e
+  frog_send "$s" End
+  for _ in $(seq 1 60); do tmux send-keys -t "$s" BSpace; done
+  sleep 0.4
+  frog_type "$s" "ws://localhost:9999"
+  frog_send "$s" Enter
+  sleep 0.8
+  assert_contains "$s" "WS" || return 1
+  # toggle auto-reconnect on
+  frog_send "$s" R
+  sleep 0.3
+  assert_contains "$s" "reconnect:on" || return 1
+  # toggle off
+  frog_send "$s" R
+  sleep 0.3
+  assert_missing "$s" "reconnect:on" || return 1
+  frog_send "$s" x
+  frog_stop "$s"
+}
+run_test "ws / auto-reconnect toggle shows indicator" test_ws_auto_reconnect
+
+# ────────────────────────────────────────────────────────────────────
+# 12 / ws auto-reconnect setting persists in settings view
+# ────────────────────────────────────────────────────────────────────
+test_ws_reconnect_setting() {
+  local s
+  s=$(frog_start ws_setting) || return 1
+  frog_send "$s" s
+  assert_contains "$s" "WS auto-reconnect" || return 1
+  frog_send "$s" Escape
+  frog_stop "$s"
+}
+run_test "settings / WS auto-reconnect entry visible" test_ws_reconnect_setting
+
 summary

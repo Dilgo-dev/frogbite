@@ -185,6 +185,7 @@ fn run(
 
         app.poll_pending();
         app.poll_ws();
+        app.ws_try_reconnect();
         app.poll_update_check();
     }
 }
@@ -1016,6 +1017,43 @@ fn handle_request_panel_key(app: &mut App, key: KeyCode) -> bool {
     false
 }
 
+fn handle_ws_panel_key(app: &mut App, key: KeyCode) -> bool {
+    match key {
+        KeyCode::Char('q') => return true,
+        KeyCode::Char('s') => app.ui.view = View::Settings,
+        KeyCode::Char('i' | 'e') => {
+            if matches!(app.ws.status, app::WsStatus::Connected) {
+                app.ws.input_editing = true;
+            }
+        }
+        KeyCode::Char('b') => app.ws_cycle_input_format(),
+        KeyCode::Char('B') => app.ws_cycle_view_format(),
+        KeyCode::Char('u') => app.ws_open_upload_popup(),
+        KeyCode::Char('p') => app.ws_send_ping(),
+        KeyCode::Char('R') => {
+            app.ui.settings.ws_auto_reconnect = !app.ui.settings.ws_auto_reconnect;
+            settings::save(&app.ui.settings);
+            if !app.ui.settings.ws_auto_reconnect {
+                app.ws.reconnect_at = None;
+                app.ws.reconnect_attempts = 0;
+            }
+        }
+        KeyCode::Char('d') => app.ws_disconnect(),
+        KeyCode::Char('c') => app.ws_clear_stream(),
+        KeyCode::Char('x') => app.ws_reset(),
+        KeyCode::Char('j') | KeyCode::Down => {
+            app.ws.scroll = app.ws.scroll.saturating_add(1);
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.ws.scroll = app.ws.scroll.saturating_sub(1);
+        }
+        KeyCode::Tab => app.ui.focus = Focus::Sidebar,
+        KeyCode::BackTab => app.ui.focus = Focus::UrlBar,
+        _ => {}
+    }
+    false
+}
+
 /// Returns `true` when the app should quit.
 fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
     match app.ui.focus {
@@ -1063,31 +1101,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             _ => {}
         },
         Focus::Body => return handle_request_panel_key(app, key),
-        Focus::Response if app.ws_active() => match key {
-            KeyCode::Char('q') => return true,
-            KeyCode::Char('s') => app.ui.view = View::Settings,
-            KeyCode::Char('i' | 'e') => {
-                if matches!(app.ws.status, app::WsStatus::Connected) {
-                    app.ws.input_editing = true;
-                }
-            }
-            KeyCode::Char('b') => app.ws_cycle_input_format(),
-            KeyCode::Char('B') => app.ws_cycle_view_format(),
-            KeyCode::Char('u') => app.ws_open_upload_popup(),
-            KeyCode::Char('p') => app.ws_send_ping(),
-            KeyCode::Char('d') => app.ws_disconnect(),
-            KeyCode::Char('c') => app.ws_clear_stream(),
-            KeyCode::Char('x') => app.ws_reset(),
-            KeyCode::Char('j') | KeyCode::Down => {
-                app.ws.scroll = app.ws.scroll.saturating_add(1);
-            }
-            KeyCode::Char('k') | KeyCode::Up => {
-                app.ws.scroll = app.ws.scroll.saturating_sub(1);
-            }
-            KeyCode::Tab => app.ui.focus = Focus::Sidebar,
-            KeyCode::BackTab => app.ui.focus = Focus::UrlBar,
-            _ => {}
-        },
+        Focus::Response if app.ws_active() => return handle_ws_panel_key(app, key),
         Focus::Response => match key {
             KeyCode::Char('q') => return true,
             KeyCode::Char('s') => app.ui.view = View::Settings,
