@@ -6,11 +6,14 @@ mod curl;
 mod environments;
 mod history;
 mod postman;
+mod run_cmd;
 mod settings;
 mod ui;
 
 use std::io;
+use std::process::ExitCode;
 
+use clap::Parser;
 use crossterm::{
     ExecutableCommand,
     event::{self, Event, KeyCode, KeyEventKind, KeyModifiers},
@@ -20,7 +23,28 @@ use ratatui::{prelude::*, widgets::Paragraph};
 
 use app::{App, Focus, Method, RequestTab, ResponseTab, View};
 
-fn main() -> io::Result<()> {
+#[derive(Debug, Parser)]
+#[command(name = "frogbite", version, about = "Terminal API tester")]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<run_cmd::Command>,
+}
+
+fn main() -> ExitCode {
+    let cli = Cli::parse();
+    if let Some(cmd) = cli.command {
+        return run_cmd::execute(&cmd);
+    }
+    match run_tui() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("error: {e}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+fn run_tui() -> io::Result<()> {
     let s = settings::load();
 
     enable_raw_mode()?;
