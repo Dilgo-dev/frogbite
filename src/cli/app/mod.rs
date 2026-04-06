@@ -22,7 +22,7 @@ pub enum SettingDisplay {
     Toggle(bool),
     Choice(String),
 }
-pub use ws::{WsDirection, WsState, WsStatus};
+pub use ws::{WsDirection, WsFormat, WsState, WsStatus};
 
 use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver};

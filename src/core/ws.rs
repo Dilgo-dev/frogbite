@@ -18,6 +18,7 @@ use tokio_tungstenite::tungstenite::protocol::Message;
 #[derive(Debug, Clone)]
 pub enum WsCommand {
     Send(String),
+    SendBinary(Vec<u8>),
     Close,
 }
 
@@ -26,6 +27,7 @@ pub enum WsCommand {
 pub enum WsEvent {
     Connected,
     Message(String),
+    Binary(Vec<u8>),
     Error(String),
     Closed,
 }
@@ -39,6 +41,10 @@ pub struct WsHandle {
 impl WsHandle {
     pub fn send(&self, text: String) {
         let _ = self.cmd_tx.send(WsCommand::Send(text));
+    }
+
+    pub fn send_binary(&self, data: Vec<u8>) {
+        let _ = self.cmd_tx.send(WsCommand::SendBinary(data));
     }
 
     pub fn close(&self) {
@@ -125,6 +131,12 @@ async fn run_session<S: BuildHasher + Send + 'static>(
                             break;
                         }
                     }
+                    Some(WsCommand::SendBinary(bytes)) => {
+                        if let Err(e) = sink.send(Message::Binary(bytes)).await {
+                            let _ = event_tx.send(WsEvent::Error(format!("send: {e}")));
+                            break;
+                        }
+                    }
                     Some(WsCommand::Close) | None => {
                         let _ = sink.send(Message::Close(None)).await;
                         break;
@@ -137,9 +149,7 @@ async fn run_session<S: BuildHasher + Send + 'static>(
                         let _ = event_tx.send(WsEvent::Message(text.as_str().to_owned()));
                     }
                     Some(Ok(Message::Binary(bytes))) => {
-                        let _ = event_tx.send(WsEvent::Message(
-                            format!("<binary {} bytes>", bytes.len()),
-                        ));
+                        let _ = event_tx.send(WsEvent::Binary(bytes.clone()));
                     }
                     Some(Ok(Message::Close(_))) | None => break,
                     Some(Ok(_)) => {}

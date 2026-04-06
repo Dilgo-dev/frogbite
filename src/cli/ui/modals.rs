@@ -1098,6 +1098,53 @@ pub(super) fn draw_proto_popup(frame: &mut Frame, app: &App) {
     frame.render_widget(Paragraph::new(Text::from(lines)), inner);
 }
 
+pub(super) fn draw_ws_upload_popup(frame: &mut Frame, app: &App) {
+    let area = frame.area();
+    let popup_w = area.width.saturating_sub(10).min(80);
+    let popup_h: u16 = 7;
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .title(" WS upload binary file ")
+        .title_style(Style::default().fg(green()).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(green()))
+        .bg(bg());
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    let mut lines = vec![
+        Line::from(Span::styled(
+            "  path to file (sent as a binary frame)",
+            Style::default().fg(muted()),
+        )),
+        Line::from(vec![
+            Span::raw("  "),
+            Span::styled(
+                format!("{}\u{2588}", app.ws.upload_buffer),
+                Style::default().fg(fg()),
+            ),
+        ]),
+        Line::default(),
+    ];
+    if let Some(err) = &app.ws.upload_error {
+        lines.push(Line::from(Span::styled(
+            format!("  ! {err}"),
+            Style::default().fg(red()),
+        )));
+    } else {
+        lines.push(Line::from(Span::styled(
+            "  Enter:send  Esc:cancel",
+            Style::default().fg(muted()),
+        )));
+    }
+    frame.render_widget(Paragraph::new(Text::from(lines)), inner);
+}
+
 pub(super) fn draw_plugins_popup(frame: &mut Frame, app: &App) {
     let area = frame.area();
     let popup_w = area.width.saturating_sub(10).min(80);

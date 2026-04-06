@@ -215,6 +215,8 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
 fn try_dispatch_modal(app: &mut App, key: &event::KeyEvent) -> bool {
     if app.response.searching {
         handle_search_key(app, key.code);
+    } else if app.ws.upload_popup_open {
+        handle_ws_upload_popup_key(app, key.code);
     } else if app.plugins.popup_open {
         handle_plugins_popup_key(app, key.code);
     } else if app.proxy.popup_open {
@@ -793,6 +795,25 @@ fn handle_tls_popup_key(app: &mut App, key: KeyCode) {
     }
 }
 
+fn handle_ws_upload_popup_key(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Esc => {
+            app.ws.upload_popup_open = false;
+            app.ws.upload_error = None;
+        }
+        KeyCode::Enter => app.ws_confirm_upload(),
+        KeyCode::Backspace => {
+            app.ws.upload_buffer.pop();
+            app.ws.upload_error = None;
+        }
+        KeyCode::Char(c) => {
+            app.ws.upload_buffer.push(c);
+            app.ws.upload_error = None;
+        }
+        _ => {}
+    }
+}
+
 fn handle_plugins_popup_key(app: &mut App, key: KeyCode) {
     match key {
         KeyCode::Esc => {
@@ -1050,6 +1071,9 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
                     app.ws.input_editing = true;
                 }
             }
+            KeyCode::Char('b') => app.ws_cycle_input_format(),
+            KeyCode::Char('B') => app.ws_cycle_view_format(),
+            KeyCode::Char('u') => app.ws_open_upload_popup(),
             KeyCode::Char('d') => app.ws_disconnect(),
             KeyCode::Char('c') => app.ws_clear_stream(),
             KeyCode::Char('x') => app.ws_reset(),
