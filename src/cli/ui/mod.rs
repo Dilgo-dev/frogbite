@@ -136,6 +136,9 @@ fn draw_main(frame: &mut Frame, app: &App) {
     if app.proxy.popup_open {
         modals::draw_proxy_popup(frame, app);
     }
+    if app.plugins.popup_open {
+        modals::draw_plugins_popup(frame, app);
+    }
 }
 
 #[allow(clippy::too_many_lines)]
@@ -196,6 +199,8 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
         "Esc:close"
     } else if app.curl_io.import_open {
         "paste cURL  Ctrl+S:import  Esc:cancel"
+    } else if app.plugins.popup_open {
+        "type plugin names  Enter:save  Esc:cancel"
     } else if app.proxy.popup_open {
         "type proxy URL  Enter:save  Esc:cancel"
     } else if app.diff.popup_open {

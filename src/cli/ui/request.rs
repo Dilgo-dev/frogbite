@@ -61,6 +61,11 @@ pub(super) fn draw_url_bar(frame: &mut Frame, app: &App, area: Rect) {
     } else {
         format!("  [proxy: {}]", app.proxy.url)
     };
+    let plugins_part = if app.plugins.names.is_empty() {
+        String::new()
+    } else {
+        format!("  [plugins: {}]", app.plugins.names.len())
+    };
     let gql_part = if app.request.method == Method::Graphql {
         let vars = app.active_gql_variables();
         if vars.trim().is_empty() {
@@ -82,7 +87,7 @@ pub(super) fn draw_url_bar(frame: &mut Frame, app: &App, area: Rect) {
         String::new()
     };
     let title = format!(
-        " Request{redirects_part}{timeout_part}{tls_part}{proxy_part}{grpc_part}{gql_part} "
+        " Request{redirects_part}{timeout_part}{tls_part}{proxy_part}{plugins_part}{grpc_part}{gql_part} "
     );
     let block = Block::default()
         .title(title)

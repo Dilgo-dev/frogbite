@@ -214,6 +214,8 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
 fn try_dispatch_modal(app: &mut App, key: &event::KeyEvent) -> bool {
     if app.response.searching {
         handle_search_key(app, key.code);
+    } else if app.plugins.popup_open {
+        handle_plugins_popup_key(app, key.code);
     } else if app.proxy.popup_open {
         handle_proxy_popup_key(app, key.code);
     } else if app.timeout.popup_open {
@@ -790,6 +792,25 @@ fn handle_tls_popup_key(app: &mut App, key: KeyCode) {
     }
 }
 
+fn handle_plugins_popup_key(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Esc => {
+            app.plugins.popup_open = false;
+            app.plugins.error = None;
+        }
+        KeyCode::Enter => app.confirm_plugins_popup(),
+        KeyCode::Backspace => {
+            app.plugins.buffer.pop();
+            app.plugins.error = None;
+        }
+        KeyCode::Char(c) => {
+            app.plugins.buffer.push(c);
+            app.plugins.error = None;
+        }
+        _ => {}
+    }
+}
+
 fn handle_proxy_popup_key(app: &mut App, key: KeyCode) {
     match key {
         KeyCode::Esc => {
@@ -1002,6 +1023,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('R') => app.toggle_follow_redirects(),
             KeyCode::Char('T') => app.open_timeout_popup(),
             KeyCode::Char('Y') => app.open_proxy_popup(),
+            KeyCode::Char('Z') => app.open_plugins_popup(),
             KeyCode::Char('S') => app.open_tls_popup(),
             KeyCode::Char('C') => app.open_cookies_popup(),
             KeyCode::Char('X') => app.open_extractors_popup(),

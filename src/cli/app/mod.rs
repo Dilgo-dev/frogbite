@@ -306,6 +306,14 @@ pub struct ProxyState {
 }
 
 #[derive(Default)]
+pub struct PluginsState {
+    pub names: Vec<String>,
+    pub popup_open: bool,
+    pub buffer: String,
+    pub error: Option<String>,
+}
+
+#[derive(Default)]
 pub struct CookiesState {
     pub store: CookieStore,
     pub popup_open: bool,
@@ -359,6 +367,7 @@ pub struct App {
     pub graphql: GraphqlState,
     pub diff: DiffState,
     pub proxy: ProxyState,
+    pub plugins: PluginsState,
     pub ui: SettingsView,
     pub follow_redirects: bool,
     pub update_available: Option<String>,
@@ -543,6 +552,7 @@ fn default_collection() -> CollectionData {
                 gql_variables: String::new(),
                 gql_operation_name: String::new(),
                 proxy_url: String::new(),
+                plugins: Vec::new(),
             },
             SavedRequest {
                 id: collections::new_id(),
@@ -574,6 +584,7 @@ fn default_collection() -> CollectionData {
                 gql_variables: String::new(),
                 gql_operation_name: String::new(),
                 proxy_url: String::new(),
+                plugins: Vec::new(),
             },
         ],
         active_request_id: None,

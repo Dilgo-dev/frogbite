@@ -145,6 +145,8 @@ pub struct SavedRequest {
     pub gql_operation_name: String,
     #[serde(default)]
     pub proxy_url: String,
+    #[serde(default)]
+    pub plugins: Vec<String>,
 }
 
 pub const fn default_timeout() -> u64 {

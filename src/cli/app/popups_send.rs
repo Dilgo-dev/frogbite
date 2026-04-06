@@ -1,6 +1,26 @@
 use super::*;
 
 impl App {
+    pub fn open_plugins_popup(&mut self) {
+        self.plugins.buffer = self.plugins.names.join(", ");
+        self.plugins.error = None;
+        self.plugins.popup_open = true;
+    }
+
+    pub fn confirm_plugins_popup(&mut self) {
+        let names: Vec<String> = self
+            .plugins
+            .buffer
+            .split(',')
+            .map(|s| s.trim().to_owned())
+            .filter(|s| !s.is_empty())
+            .collect();
+        self.plugins.names = names;
+        self.plugins.popup_open = false;
+        self.plugins.error = None;
+        self.sync_to_collection();
+    }
+
     pub fn open_proxy_popup(&mut self) {
         self.proxy.buffer.clone_from(&self.proxy.url);
         self.proxy.error = None;
@@ -260,9 +280,9 @@ impl App {
         self.response.scroll = 0;
         self.sync_to_collection();
 
-        let resolved_url = self.resolve_variables(&self.request.url);
+        let mut resolved_url = self.resolve_variables(&self.request.url);
         let is_graphql = self.request.method == Method::Graphql;
-        let resolved_body = if is_graphql {
+        let mut resolved_body = if is_graphql {
             self.build_graphql_envelope()
         } else {
             self.resolve_variables(&self.request.body)
@@ -274,6 +294,45 @@ impl App {
             .map(|(k, v)| (k.clone(), self.resolve_variables(v)))
             .collect();
         self.apply_auth_headers(&mut resolved_headers);
+
+        let mut runtime_method = if is_graphql {
+            "POST".to_owned()
+        } else {
+            self.request.method.as_str().to_owned()
+        };
+
+        // Run request-side plugins. Only Raw/GraphQL bodies are supported on
+        // the request side; form/multipart requests with plugins error out.
+        if !self.plugins.names.is_empty() {
+            if !is_graphql && !matches!(self.request.body_type, BodyType::Raw) {
+                self.response.last = Some(Err(
+                    "plugins are only supported for Raw and GraphQL request bodies".to_owned(),
+                ));
+                self.response.loading = false;
+                return;
+            }
+            let names = self.plugins.names.clone();
+            let mut env = frogbite::core::plugins::PluginRequest {
+                method: runtime_method.clone(),
+                url: resolved_url.clone(),
+                headers: resolved_headers.clone(),
+                body: resolved_body.clone(),
+            };
+            for name in &names {
+                match frogbite::core::plugins::run_request_hook(name, &env) {
+                    Ok(out) => env = out,
+                    Err(e) => {
+                        self.response.last = Some(Err(e));
+                        self.response.loading = false;
+                        return;
+                    }
+                }
+            }
+            runtime_method = env.method;
+            resolved_url = env.url;
+            resolved_headers = env.headers;
+            resolved_body = env.body;
+        }
 
         let has_cookie_header = resolved_headers
             .keys()
@@ -331,13 +390,8 @@ impl App {
             }
         };
 
-        let method_str = if is_graphql {
-            "POST".to_owned()
-        } else {
-            self.request.method.as_str().to_owned()
-        };
         let opts = RequestOptions {
-            method: method_str,
+            method: runtime_method,
             url: resolved_url,
             headers: resolved_headers,
             body,
@@ -399,10 +453,39 @@ impl App {
         };
         let recv = pending.rx.try_recv();
         match recv {
-            Ok(result) => {
+            Ok(mut result) => {
                 let Some(pending) = self.pending.take() else {
                     return false;
                 };
+                // Run response-side plugins on the live response.
+                if !self.plugins.names.is_empty() {
+                    if let Ok(resp) = &result {
+                        let mut env = frogbite::core::plugins::PluginResponse {
+                            status: resp.status,
+                            status_text: resp.status_text.clone(),
+                            headers: resp.headers.clone(),
+                            body: resp.body.clone(),
+                        };
+                        let mut plugin_err: Option<String> = None;
+                        for name in &self.plugins.names.clone() {
+                            match frogbite::core::plugins::run_response_hook(name, &env) {
+                                Ok(out) => env = out,
+                                Err(e) => {
+                                    plugin_err = Some(e);
+                                    break;
+                                }
+                            }
+                        }
+                        if let Some(e) = plugin_err {
+                            result = Err(e);
+                        } else if let Ok(r) = &mut result {
+                            r.status = env.status;
+                            r.status_text = env.status_text;
+                            r.headers = env.headers;
+                            r.body = env.body;
+                        }
+                    }
+                }
                 if let Ok(resp) = &result {
                     if !resp.set_cookies.is_empty() {
                         self.cookies
