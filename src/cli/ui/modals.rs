@@ -1049,3 +1049,103 @@ fn draw_env_var_edit(frame: &mut Frame, app: &App, parent: Rect) {
     let paragraph = Paragraph::new(Text::from(lines));
     frame.render_widget(paragraph, edit_inner);
 }
+
+pub(super) fn draw_proto_popup(frame: &mut Frame, app: &App) {
+    let area = frame.area();
+    let popup_w = area.width.saturating_sub(10).min(80);
+    let popup_h: u16 = 7;
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .title(" Load .proto ")
+        .title_style(Style::default().fg(GREEN).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GREEN))
+        .bg(BG);
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    let mut lines = vec![
+        Line::from(Span::styled(
+            "  Path to .proto file:",
+            Style::default().fg(MUTED),
+        )),
+        Line::from(vec![
+            Span::raw("  "),
+            Span::styled(
+                format!("{}\u{2588}", app.grpc.proto_buffer),
+                Style::default().fg(FG),
+            ),
+        ]),
+        Line::default(),
+    ];
+    if let Some(err) = &app.grpc.proto_error {
+        lines.push(Line::from(Span::styled(
+            format!("  ! {err}"),
+            Style::default().fg(RED),
+        )));
+    } else {
+        lines.push(Line::from(Span::styled(
+            "  Enter:load  Esc:cancel",
+            Style::default().fg(MUTED),
+        )));
+    }
+
+    frame.render_widget(Paragraph::new(Text::from(lines)), inner);
+}
+
+pub(super) fn draw_grpc_method_popup(frame: &mut Frame, app: &App) {
+    let area = frame.area();
+    let popup_w = area.width.saturating_sub(10).min(80);
+    let popup_h = (app.grpc.methods.len() as u16 + 4)
+        .min(area.height.saturating_sub(6))
+        .max(6);
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .title(" gRPC method ")
+        .title_style(Style::default().fg(GREEN).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GREEN))
+        .bg(BG);
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    if app.grpc.methods.is_empty() {
+        let msg = Paragraph::new(Text::styled(
+            "No methods - load a .proto first (P)",
+            Style::default().fg(MUTED).italic(),
+        ))
+        .alignment(Alignment::Center);
+        frame.render_widget(msg, inner);
+        return;
+    }
+
+    for (i, name) in app.grpc.methods.iter().enumerate() {
+        let row_y = inner.y + i as u16;
+        if row_y >= inner.y + inner.height {
+            break;
+        }
+        let selected = i == app.grpc.method_popup_selected;
+        let row = Rect::new(inner.x, row_y, inner.width, 1);
+        if selected {
+            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+        }
+        let line = Line::from(vec![
+            Span::styled(
+                if selected { " > " } else { "   " },
+                Style::default().fg(GREEN),
+            ),
+            Span::styled(name, Style::default().fg(FG)),
+        ]);
+        frame.render_widget(Paragraph::new(line), row);
+    }
+}

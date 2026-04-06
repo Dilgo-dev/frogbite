@@ -140,6 +140,8 @@ fn process_item(
             last_response: None,
             last_error: None,
             last_assertion_results: Vec::new(),
+            proto_path: String::new(),
+            grpc_method: String::new(),
         });
     }
 }

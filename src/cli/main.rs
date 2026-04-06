@@ -237,6 +237,10 @@ fn try_dispatch_modal(app: &mut App, key: &event::KeyEvent) -> bool {
         handle_history_key(app, key.code);
     } else if app.method_popup.open {
         handle_method_popup_key(app, key.code);
+    } else if app.grpc.proto_popup_open {
+        handle_proto_popup_key(app, key.code);
+    } else if app.grpc.method_popup_open {
+        handle_grpc_method_popup_key(app, key.code);
     } else {
         return false;
     }
@@ -408,6 +412,42 @@ fn handle_url_edit_key(app: &mut App, key: KeyCode) {
         KeyCode::Home => app.url_cursor_home(),
         KeyCode::End => app.url_cursor_end(),
         KeyCode::Char(c) => app.url_insert(c),
+        _ => {}
+    }
+}
+
+fn handle_proto_popup_key(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Esc => {
+            app.grpc.proto_popup_open = false;
+            app.grpc.proto_error = None;
+        }
+        KeyCode::Enter => app.confirm_proto_popup(),
+        KeyCode::Backspace => {
+            app.grpc.proto_buffer.pop();
+            app.grpc.proto_error = None;
+        }
+        KeyCode::Char(c) => {
+            app.grpc.proto_buffer.push(c);
+            app.grpc.proto_error = None;
+        }
+        _ => {}
+    }
+}
+
+fn handle_grpc_method_popup_key(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Esc => app.grpc.method_popup_open = false,
+        KeyCode::Char('j') | KeyCode::Down => {
+            let max = app.grpc.methods.len().saturating_sub(1);
+            if app.grpc.method_popup_selected < max {
+                app.grpc.method_popup_selected += 1;
+            }
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.grpc.method_popup_selected = app.grpc.method_popup_selected.saturating_sub(1);
+        }
+        KeyCode::Enter => app.confirm_grpc_method_popup(),
         _ => {}
     }
 }
@@ -864,6 +904,8 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
                 app.request.cursor_pos = app.request.url.len();
             }
             KeyCode::Char('m') => app.open_method_popup(),
+            KeyCode::Char('P') => app.open_proto_popup(),
+            KeyCode::Char('G') => app.open_grpc_method_popup(),
             KeyCode::Char('R') => app.toggle_follow_redirects(),
             KeyCode::Char('T') => app.open_timeout_popup(),
             KeyCode::Char('S') => app.open_tls_popup(),

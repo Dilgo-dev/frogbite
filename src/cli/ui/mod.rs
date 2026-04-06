@@ -30,6 +30,7 @@ pub const fn method_color(method: &Method) -> Color {
         Method::Delete => RED,
         Method::Head => TEAL,
         Method::Options => MUTED,
+        Method::Grpc => Color::Rgb(0, 188, 212),
     }
 }
 
@@ -116,6 +117,12 @@ fn draw_main(frame: &mut Frame, app: &App) {
     if app.env.editor.open {
         modals::draw_env_editor(frame, app);
     }
+    if app.grpc.proto_popup_open {
+        modals::draw_proto_popup(frame, app);
+    }
+    if app.grpc.method_popup_open {
+        modals::draw_grpc_method_popup(frame, app);
+    }
 }
 
 #[allow(clippy::too_many_lines)]
@@ -176,7 +183,9 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
         "Esc:close"
     } else if app.curl_io.import_open {
         "paste cURL  Ctrl+S:import  Esc:cancel"
-    } else if app.method_popup.open {
+    } else if app.grpc.proto_popup_open {
+        "type path  Enter:load  Esc:cancel"
+    } else if app.grpc.method_popup_open || app.method_popup.open {
         "j/k:navigate  Enter:select  Esc:cancel"
     } else if app.history.open {
         "j/k:navigate  Enter:load  Esc:close"
@@ -194,7 +203,7 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
                     "j/k:nav  a:new  A:folder  d:del  D:dup  r:rename  i:curl  I:postman  q:quit"
                 }
                 Focus::UrlBar => {
-                    "e:edit  m:method  A:auth  R:redir  T:tout  S:tls  C:cookies  X:extract  V:assert"
+                    "e:edit  m:method  P:proto  G:grpcmethod  A:auth  R:redir  T:tout  S:tls  C:cookies"
                 }
                 Focus::Body => match app.request.tab {
                     RequestTab::Body => {

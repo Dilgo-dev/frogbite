@@ -1,6 +1,7 @@
 mod auth_env;
 mod clipboard;
 mod editing;
+mod grpc;
 mod import;
 mod kv_editor;
 mod popups_send;
@@ -9,6 +10,7 @@ mod url_utils;
 mod vars_search;
 mod ws;
 
+pub use grpc::GrpcState;
 pub use kv_editor::KvEditorState;
 pub use ws::{WsDirection, WsState, WsStatus};
 
@@ -45,6 +47,7 @@ pub enum Method {
     Delete,
     Head,
     Options,
+    Grpc,
 }
 
 impl Method {
@@ -57,6 +60,7 @@ impl Method {
             Self::Delete => "DELETE",
             Self::Head => "HEAD",
             Self::Options => "OPTIONS",
+            Self::Grpc => "GRPC",
         }
     }
 
@@ -69,6 +73,7 @@ impl Method {
             Self::Delete,
             Self::Head,
             Self::Options,
+            Self::Grpc,
         ]
     }
 
@@ -86,6 +91,7 @@ impl Method {
             "DELETE" => Self::Delete,
             "HEAD" => Self::Head,
             "OPTIONS" => Self::Options,
+            "GRPC" => Self::Grpc,
             _ => Self::Get,
         }
     }
@@ -333,6 +339,7 @@ pub struct App {
     pub extractors: ExtractorsState,
     pub assertions: AssertionsState,
     pub ws: WsState,
+    pub grpc: GrpcState,
     pub ui: SettingsView,
     pub follow_redirects: bool,
     pub update_available: Option<String>,
@@ -512,6 +519,8 @@ fn default_collection() -> CollectionData {
                 last_response: None,
                 last_error: None,
                 last_assertion_results: Vec::new(),
+                proto_path: String::new(),
+                grpc_method: String::new(),
             },
             SavedRequest {
                 id: collections::new_id(),
@@ -538,6 +547,8 @@ fn default_collection() -> CollectionData {
                 last_response: None,
                 last_error: None,
                 last_assertion_results: Vec::new(),
+                proto_path: String::new(),
+                grpc_method: String::new(),
             },
         ],
         active_request_id: None,

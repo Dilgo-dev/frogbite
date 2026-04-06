@@ -2,7 +2,7 @@ use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Paragraph};
 
 use super::*;
-use crate::app::{App, Focus, KvEditorState, RequestTab};
+use crate::app::{App, Focus, KvEditorState, Method, RequestTab};
 use crate::collections::Auth;
 
 pub(super) fn draw_url_bar(frame: &mut Frame, app: &App, area: Rect) {
@@ -56,7 +56,17 @@ pub(super) fn draw_url_bar(frame: &mut Frame, app: &App, area: Rect) {
     } else {
         ""
     };
-    let title = format!(" Request{redirects_part}{timeout_part}{tls_part} ");
+    let grpc_part = if app.request.method == Method::Grpc {
+        let label = app.active_grpc_method_label();
+        if label.is_empty() {
+            "  [grpc: no method]".to_owned()
+        } else {
+            format!("  [grpc: {label}]")
+        }
+    } else {
+        String::new()
+    };
+    let title = format!(" Request{redirects_part}{timeout_part}{tls_part}{grpc_part} ");
     let block = Block::default()
         .title(title)
         .title_style(Style::default().fg(MUTED))

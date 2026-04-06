@@ -135,6 +135,10 @@ pub struct SavedRequest {
     pub last_error: Option<String>,
     #[serde(default)]
     pub last_assertion_results: Vec<AssertionResult>,
+    #[serde(default)]
+    pub proto_path: String,
+    #[serde(default)]
+    pub grpc_method: String,
 }
 
 pub const fn default_timeout() -> u64 {

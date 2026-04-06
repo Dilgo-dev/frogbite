@@ -1,5 +1,33 @@
 use super::*;
 
+#[allow(clippy::option_if_let_else)]
+fn http_to_grpc_scheme(url: &str) -> String {
+    let trimmed = url.trim();
+    if trimmed.starts_with("grpc://") || trimmed.starts_with("grpcs://") {
+        trimmed.to_owned()
+    } else if let Some(rest) = trimmed.strip_prefix("https://") {
+        format!("grpcs://{rest}")
+    } else if let Some(rest) = trimmed.strip_prefix("http://") {
+        format!("grpc://{rest}")
+    } else if trimmed.is_empty() {
+        "grpc://".to_owned()
+    } else {
+        format!("grpc://{trimmed}")
+    }
+}
+
+#[allow(clippy::option_if_let_else)]
+fn grpc_to_http_scheme(url: &str) -> String {
+    let trimmed = url.trim();
+    if let Some(rest) = trimmed.strip_prefix("grpcs://") {
+        format!("https://{rest}")
+    } else if let Some(rest) = trimmed.strip_prefix("grpc://") {
+        format!("http://{rest}")
+    } else {
+        trimmed.to_owned()
+    }
+}
+
 impl App {
     pub fn save_collections(&self) {
         let data = CollectionData {
@@ -70,7 +98,17 @@ impl App {
     }
 
     pub fn confirm_method_popup(&mut self) {
-        self.request.method = Method::all()[self.method_popup.selected].clone();
+        let new_method = Method::all()[self.method_popup.selected].clone();
+        let was_grpc = self.request.method == Method::Grpc;
+        let now_grpc = new_method == Method::Grpc;
+        self.request.method = new_method;
+        if now_grpc && !was_grpc {
+            self.request.url = http_to_grpc_scheme(&self.request.url);
+            self.request.cursor_pos = self.request.url.len();
+        } else if was_grpc && !now_grpc {
+            self.request.url = grpc_to_http_scheme(&self.request.url);
+            self.request.cursor_pos = self.request.url.len();
+        }
         self.method_popup.open = false;
         self.sync_to_collection();
     }
@@ -347,6 +385,8 @@ impl App {
             last_response: None,
             last_error: None,
             last_assertion_results: Vec::new(),
+            proto_path: String::new(),
+            grpc_method: String::new(),
         };
 
         let id = req.id.clone();
@@ -404,6 +444,8 @@ impl App {
                 last_response: req.last_response,
                 last_error: req.last_error,
                 last_assertion_results: req.last_assertion_results,
+                proto_path: req.proto_path,
+                grpc_method: req.grpc_method,
             };
             let id = new_req.id.clone();
             self.sidebar.requests.push(new_req);

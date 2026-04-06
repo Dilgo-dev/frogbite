@@ -44,3 +44,9 @@ tokio = { version = "1", features = ["full"] }
 tokio-tungstenite = { version = "0.24", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
 clap = { version = "4", features = ["derive"] }
+prost = "0.13"
+prost-reflect = { version = "0.14", features = ["serde"] }
+protox = "0.7"
+tonic = { version = "0.12", default-features = false, features = ["codegen", "prost", "transport", "tls", "tls-webpki-roots"] }
+bytes = "1"
+http = "1"

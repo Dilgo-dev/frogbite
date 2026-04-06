@@ -224,6 +224,10 @@ impl App {
         if self.pending.is_some() {
             return;
         }
+        if self.request.method == Method::Grpc {
+            self.send_grpc_request();
+            return;
+        }
         self.response.loading = true;
         self.response.last = None;
         self.response.scroll = 0;
