@@ -108,6 +108,12 @@ pub struct SavedRequest {
     pub content_type: ContentType,
     #[serde(default)]
     pub form_data: Vec<(String, String)>,
+    #[serde(default = "default_true")]
+    pub follow_redirects: bool,
+}
+
+const fn default_true() -> bool {
+    true
 }
 
 /// A folder grouping requests.

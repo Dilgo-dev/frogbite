@@ -128,6 +128,7 @@ fn process_item(
             body_type: collections::BodyType::Raw,
             content_type: collections::ContentType::Json,
             form_data: Vec::new(),
+            follow_redirects: true,
         });
     }
 }

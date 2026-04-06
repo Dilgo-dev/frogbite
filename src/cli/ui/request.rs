@@ -33,8 +33,13 @@ pub(super) fn draw_url_bar(frame: &mut Frame, app: &App, area: Rect) {
         ])
     };
 
+    let title = if app.follow_redirects {
+        " Request ".to_owned()
+    } else {
+        " Request  [redirects: off] ".to_owned()
+    };
     let block = Block::default()
-        .title(" Request ")
+        .title(title)
         .title_style(Style::default().fg(MUTED))
         .borders(Borders::ALL)
         .border_style(if is_focused {

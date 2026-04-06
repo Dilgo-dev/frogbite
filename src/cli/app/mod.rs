@@ -171,6 +171,7 @@ pub struct App {
     pub response_search_buf: String,
     pub response_match_idx: usize,
     pub clipboard_msg: Option<String>,
+    pub follow_redirects: bool,
 }
 
 impl App {
@@ -264,6 +265,7 @@ impl App {
             response_search_buf: String::new(),
             response_match_idx: 0,
             clipboard_msg: None,
+            follow_redirects: true,
         };
 
         if let Some(id) = &app.active_request_id.clone() {
@@ -385,6 +387,7 @@ impl App {
             self.body_type = req.body_type;
             self.content_type = req.content_type;
             self.form_editor.entries = req.form_data.clone();
+            self.follow_redirects = req.follow_redirects;
             self.form_editor.selected = 0;
             self.form_editor.editing = false;
             self.cursor_pos = self.url.len();
@@ -422,6 +425,7 @@ impl App {
             req.body_type = self.body_type;
             req.content_type = self.content_type;
             req.form_data.clone_from(&self.form_editor.entries);
+            req.follow_redirects = self.follow_redirects;
         }
         self.save_collections();
     }
@@ -570,6 +574,7 @@ impl App {
             body_type: BodyType::Raw,
             content_type: ContentType::Json,
             form_data: Vec::new(),
+            follow_redirects: true,
         };
 
         let id = req.id.clone();
@@ -615,6 +620,7 @@ impl App {
                 body_type: req.body_type,
                 content_type: req.content_type,
                 form_data: req.form_data,
+                follow_redirects: req.follow_redirects,
             };
             let id = new_req.id.clone();
             self.requests.push(new_req);
@@ -878,6 +884,7 @@ impl App {
             body_type: BodyType::Raw,
             content_type: ContentType::Json,
             form_data: Vec::new(),
+            follow_redirects: true,
         };
 
         let id = req.id.clone();
@@ -1390,6 +1397,11 @@ impl App {
 
     // -- Request --
 
+    pub fn toggle_follow_redirects(&mut self) {
+        self.follow_redirects = !self.follow_redirects;
+        self.sync_to_collection();
+    }
+
     pub fn send_request(&mut self) {
         self.loading = true;
         self.response_scroll = 0;
@@ -1448,6 +1460,7 @@ impl App {
             url: resolved_url,
             headers: resolved_headers,
             body,
+            follow_redirects: self.follow_redirects,
         };
 
         let result = frogbite::core::http::send_request(&opts);
@@ -1520,6 +1533,7 @@ fn default_collection() -> CollectionData {
                 body_type: BodyType::Raw,
                 content_type: ContentType::Json,
                 form_data: Vec::new(),
+                follow_redirects: true,
             },
             SavedRequest {
                 id: collections::new_id(),
@@ -1534,6 +1548,7 @@ fn default_collection() -> CollectionData {
                 body_type: BodyType::Raw,
                 content_type: ContentType::Json,
                 form_data: Vec::new(),
+                follow_redirects: true,
             },
         ],
         active_request_id: None,

@@ -80,6 +80,14 @@ fn draw_response_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 ),
                 Span::raw("  "),
                 Span::styled(format_size(resp.body.len()), Style::default().fg(MUTED)),
+                if resp.redirect_chain.is_empty() {
+                    Span::raw("")
+                } else {
+                    Span::styled(
+                        format!("  \u{21aa}{}", resp.redirect_chain.len()),
+                        Style::default().fg(TEAL),
+                    )
+                },
                 Span::raw("    "),
                 if app.response_tab == ResponseTab::Body {
                     Span::styled("Body", Style::default().fg(GREEN).bold().underlined())
@@ -129,17 +137,27 @@ fn draw_response_content(frame: &mut Frame, app: &App, area: Rect) {
 
     match &app.response {
         Some(Ok(resp)) if app.response_tab == ResponseTab::Headers => {
-            let lines: Vec<Line> = resp
-                .headers
-                .iter()
-                .map(|(k, v)| {
-                    Line::from(vec![
-                        Span::styled(k, Style::default().fg(MUTED)),
-                        Span::styled(": ", Style::default().fg(MUTED)),
-                        Span::styled(v, Style::default().fg(FG)),
-                    ])
-                })
-                .collect();
+            let mut lines: Vec<Line> = Vec::new();
+            if !resp.redirect_chain.is_empty() {
+                lines.push(Line::from(Span::styled(
+                    format!("Redirect chain ({}):", resp.redirect_chain.len()),
+                    Style::default().fg(TEAL).bold(),
+                )));
+                for (i, url) in resp.redirect_chain.iter().enumerate() {
+                    lines.push(Line::from(vec![
+                        Span::styled(format!("  {}. ", i + 1), Style::default().fg(MUTED)),
+                        Span::styled(url, Style::default().fg(FG)),
+                    ]));
+                }
+                lines.push(Line::default());
+            }
+            lines.extend(resp.headers.iter().map(|(k, v)| {
+                Line::from(vec![
+                    Span::styled(k, Style::default().fg(MUTED)),
+                    Span::styled(": ", Style::default().fg(MUTED)),
+                    Span::styled(v, Style::default().fg(FG)),
+                ])
+            }));
             let paragraph = Paragraph::new(Text::from(lines))
                 .block(block)
                 .scroll((app.response_scroll, 0));

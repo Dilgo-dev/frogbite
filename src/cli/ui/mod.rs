@@ -144,7 +144,7 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
                     "j/k:nav  a:new  A:folder  d:del  D:dup  r:rename  i:curl  I:postman  q:quit"
                 }
                 Focus::UrlBar => {
-                    "e:edit  m:method  A:auth  Enter:send  h:history  E:env  s:settings"
+                    "e:edit  m:method  A:auth  R:redirects  Enter:send  h:history  E:env  s:settings"
                 }
                 Focus::Body => match app.request_tab {
                     RequestTab::Body => {

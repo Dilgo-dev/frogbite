@@ -688,6 +688,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
                 app.cursor_pos = app.url.len();
             }
             KeyCode::Char('m') => app.open_method_popup(),
+            KeyCode::Char('R') => app.toggle_follow_redirects(),
             KeyCode::Enter => app.send_request(),
             KeyCode::Tab => app.focus = Focus::Body,
             KeyCode::BackTab => app.focus = Focus::Sidebar,

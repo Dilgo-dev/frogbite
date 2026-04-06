@@ -1,6 +1,8 @@
 use reqwest::blocking::{Client, Response};
+use reqwest::redirect;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 /// Body payload for an outgoing HTTP request.
@@ -18,6 +20,8 @@ pub struct RequestOptions {
     pub url: String,
     pub headers: HashMap<String, String>,
     pub body: Option<RequestBody>,
+    #[serde(default)]
+    pub follow_redirects: bool,
 }
 
 /// Parsed HTTP response with status, headers, body and timing.
@@ -28,12 +32,32 @@ pub struct HttpResponse {
     pub headers: HashMap<String, String>,
     pub body: String,
     pub duration_ms: u128,
+    #[serde(default)]
+    pub redirect_chain: Vec<String>,
 }
 
 /// Sends a blocking HTTP request and returns the parsed response.
 pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
+    let chain: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+
+    let policy = if opts.follow_redirects {
+        let chain_c = Arc::clone(&chain);
+        redirect::Policy::custom(move |attempt| {
+            if attempt.previous().len() >= 10 {
+                return attempt.error("too many redirects");
+            }
+            if let Ok(mut c) = chain_c.lock() {
+                c.push(attempt.url().to_string());
+            }
+            attempt.follow()
+        })
+    } else {
+        redirect::Policy::none()
+    };
+
     let client = Client::builder()
         .timeout(Duration::from_secs(30))
+        .redirect(policy)
         .build()
         .map_err(|e| format!("Failed to create client: {e}"))?;
 
@@ -84,11 +108,14 @@ pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
         .text()
         .map_err(|e| format!("Failed to read body: {e}"))?;
 
+    let redirect_chain = chain.lock().map(|c| c.clone()).unwrap_or_default();
+
     Ok(HttpResponse {
         status,
         status_text,
         headers,
         body,
         duration_ms,
+        redirect_chain,
     })
 }
