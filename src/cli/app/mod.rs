@@ -5,8 +5,16 @@ mod url_utils;
 pub use kv_editor::KvEditorState;
 
 use std::collections::HashMap;
+use std::sync::mpsc::{self, Receiver};
 
 use frogbite::core::http::{HttpResponse, RequestOptions};
+
+struct PendingRequest {
+    rx: Receiver<Result<HttpResponse, String>>,
+    method: String,
+    url: String,
+    body: String,
+}
 
 use crate::collections::{self, Auth, BodyType, CollectionData, ContentType, Folder, SavedRequest};
 use crate::curl;
@@ -176,6 +184,7 @@ pub struct App {
     pub timeout_popup_open: bool,
     pub timeout_buffer: String,
     pub timeout_error: bool,
+    pending: Option<PendingRequest>,
 }
 
 impl App {
@@ -275,6 +284,7 @@ impl App {
             timeout_popup_open: false,
             timeout_buffer: String::new(),
             timeout_error: false,
+            pending: None,
         };
 
         if let Some(id) = &app.active_request_id.clone() {
@@ -1434,7 +1444,11 @@ impl App {
     }
 
     pub fn send_request(&mut self) {
+        if self.pending.is_some() {
+            return;
+        }
         self.loading = true;
+        self.response = None;
         self.response_scroll = 0;
         self.sync_to_collection();
 
@@ -1495,22 +1509,50 @@ impl App {
             timeout_secs: self.timeout_secs,
         };
 
-        let result = frogbite::core::http::send_request(&opts);
+        let (tx, rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            let result = frogbite::core::http::send_request(&opts);
+            let _ = tx.send(result);
+        });
 
-        let entry = HistoryEntry {
+        self.pending = Some(PendingRequest {
+            rx,
             method: self.method.as_str().to_owned(),
             url: self.url.clone(),
             body: self.body.clone(),
-            status: result.as_ref().ok().map(|r| r.status),
-            duration_ms: result.as_ref().ok().map(|r| r.duration_ms),
-            timestamp: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map_or(0, |d| d.as_secs()),
-        };
-        history::append(entry);
+        });
+    }
 
-        self.response = Some(result);
-        self.loading = false;
+    pub fn poll_pending(&mut self) -> bool {
+        let Some(pending) = &self.pending else {
+            return false;
+        };
+        match pending.rx.try_recv() {
+            Ok(result) => {
+                let entry = HistoryEntry {
+                    method: pending.method.clone(),
+                    url: pending.url.clone(),
+                    body: pending.body.clone(),
+                    status: result.as_ref().ok().map(|r| r.status),
+                    duration_ms: result.as_ref().ok().map(|r| r.duration_ms),
+                    timestamp: std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map_or(0, |d| d.as_secs()),
+                };
+                history::append(entry);
+                self.response = Some(result);
+                self.loading = false;
+                self.pending = None;
+                true
+            }
+            Err(mpsc::TryRecvError::Empty) => false,
+            Err(mpsc::TryRecvError::Disconnected) => {
+                self.response = Some(Err("request thread died".to_owned()));
+                self.loading = false;
+                self.pending = None;
+                true
+            }
+        }
     }
 
     pub fn formatted_response_body(&self) -> String {
