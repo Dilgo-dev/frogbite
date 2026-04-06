@@ -167,4 +167,28 @@ test_sidebar_nav() {
 }
 run_test "sidebar / navigates default Examples folder" test_sidebar_nav
 
+# ────────────────────────────────────────────────────────────────────
+# 10 / ws panel activates for ws:// URL and shows stream
+# ────────────────────────────────────────────────────────────────────
+test_ws_panel() {
+  local s
+  s=$(frog_start ws_panel) || return 1
+  # focus UrlBar and enter edit mode
+  frog_send "$s" Tab
+  frog_send "$s" e
+  # clear existing URL: End to be sure we're at the end, then BSpace many times
+  frog_send "$s" End
+  for _ in $(seq 1 60); do tmux send-keys -t "$s" BSpace; done
+  sleep 0.4
+  frog_type "$s" "ws://localhost:9999"
+  frog_send "$s" Enter
+  sleep 0.8
+  assert_contains "$s" "WS" || return 1
+  assert_contains "$s" "connecting to ws://localhost:9999" || return 1
+  assert_contains "$s" "message" || return 1
+  frog_send "$s" x
+  frog_stop "$s"
+}
+run_test "ws / panel activates for ws:// URL" test_ws_panel
+
 summary

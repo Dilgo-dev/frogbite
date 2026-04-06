@@ -1074,6 +1074,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('b') => app.ws_cycle_input_format(),
             KeyCode::Char('B') => app.ws_cycle_view_format(),
             KeyCode::Char('u') => app.ws_open_upload_popup(),
+            KeyCode::Char('p') => app.ws_send_ping(),
             KeyCode::Char('d') => app.ws_disconnect(),
             KeyCode::Char('c') => app.ws_clear_stream(),
             KeyCode::Char('x') => app.ws_reset(),

@@ -229,6 +229,17 @@ impl App {
         self.ws.view_format = self.ws.view_format.next();
     }
 
+    pub fn ws_send_ping(&mut self) {
+        if !matches!(self.ws.status, WsStatus::Connected) {
+            return;
+        }
+        let Some(handle) = &self.ws.handle else {
+            return;
+        };
+        handle.send_ping(Vec::new());
+        self.ws.push(WsDirection::Sent, "ping".to_owned());
+    }
+
     pub fn ws_open_upload_popup(&mut self) {
         if !matches!(self.ws.status, WsStatus::Connected) {
             return;
@@ -290,6 +301,22 @@ impl App {
                 }
                 Ok(WsEvent::Binary(data)) => {
                     self.ws.push_binary(WsDirection::Recv, data);
+                }
+                Ok(WsEvent::Ping(payload)) => {
+                    if payload.is_empty() {
+                        self.ws.push(WsDirection::Recv, "ping".to_owned());
+                    } else {
+                        self.ws
+                            .push(WsDirection::Recv, format!("ping ({} bytes)", payload.len()));
+                    }
+                }
+                Ok(WsEvent::Pong(payload)) => {
+                    if payload.is_empty() {
+                        self.ws.push(WsDirection::Recv, "pong".to_owned());
+                    } else {
+                        self.ws
+                            .push(WsDirection::Recv, format!("pong ({} bytes)", payload.len()));
+                    }
                 }
                 Ok(WsEvent::Error(e)) => {
                     self.ws.push(WsDirection::Error, e);

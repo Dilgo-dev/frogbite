@@ -136,9 +136,9 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect) {
     } else if app.ws.input.is_empty() {
         match app.ws.status {
             WsStatus::Connected => match app.ws.input_format {
-                WsFormat::Text => "i:edit  b:fmt  u:upload".to_owned(),
-                WsFormat::Hex => "type hex pairs (b:fmt  u:upload)".to_owned(),
-                WsFormat::Base64 => "type base64 (b:fmt  u:upload)".to_owned(),
+                WsFormat::Text => "i:edit  b:fmt  u:upload  p:ping".to_owned(),
+                WsFormat::Hex => "type hex pairs (b:fmt  u:upload  p:ping)".to_owned(),
+                WsFormat::Base64 => "type base64 (b:fmt  u:upload  p:ping)".to_owned(),
             },
             _ => String::new(),
         }
