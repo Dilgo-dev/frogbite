@@ -9,6 +9,14 @@ use super::App;
 pub struct GqlOperation {
     pub kind: String,
     pub name: String,
+    pub args: Vec<GqlArg>,
+    pub return_fields: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GqlArg {
+    pub name: String,
+    pub type_name: String,
 }
 
 #[derive(Default)]
@@ -31,7 +39,18 @@ query IntrospectionQuery {
     types {
       kind
       name
-      fields { name }
+      fields {
+        name
+        args {
+          name
+          type { kind name ofType { kind name ofType { kind name ofType { kind name } } } }
+        }
+        type {
+          kind
+          name
+          ofType { kind name ofType { kind name ofType { kind name } } }
+        }
+      }
     }
   }
 }
@@ -167,18 +186,86 @@ impl App {
             self.graphql.schema_popup_open = false;
             return;
         };
-        let template = format!("{} {{\n  {}\n}}\n", op.kind.to_lowercase(), op.name);
+        let (template, vars_skeleton) = build_template(&op);
         self.request.body = template;
         self.request.body_row = 0;
         self.request.body_col = 0;
         if let Some(id) = self.sidebar.active_request_id.clone() {
             if let Some(req) = self.sidebar.requests.iter_mut().find(|r| r.id == id) {
                 req.body.clone_from(&self.request.body);
-                req.gql_operation_name.clone_from(&op.name);
+                op.name.clone_into(&mut req.gql_operation_name);
+                if !vars_skeleton.is_empty() {
+                    req.gql_variables = vars_skeleton;
+                }
             }
             self.save_collections();
         }
         self.graphql.schema_popup_open = false;
+    }
+}
+
+/// Builds a query template + variables JSON skeleton for an operation.
+fn build_template(op: &GqlOperation) -> (String, String) {
+    let kind_kw = op.kind.to_lowercase();
+    let op_title = capitalize(&op.name);
+
+    let (sig, call_args, vars_json) = if op.args.is_empty() {
+        (String::new(), String::new(), String::new())
+    } else {
+        let sig = op
+            .args
+            .iter()
+            .map(|a| format!("${}: {}", a.name, a.type_name))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let call = op
+            .args
+            .iter()
+            .map(|a| format!("{}: ${}", a.name, a.name))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mut map = serde_json::Map::new();
+        for a in &op.args {
+            map.insert(a.name.clone(), placeholder_for(&a.type_name));
+        }
+        let json = serde_json::to_string_pretty(&Value::Object(map)).unwrap_or_default();
+        (format!("({sig})"), format!("({call})"), json)
+    };
+
+    let selection = if op.return_fields.is_empty() {
+        String::new()
+    } else {
+        let inner = op
+            .return_fields
+            .iter()
+            .map(|f| format!("    {f}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        format!(" {{\n{inner}\n  }}")
+    };
+
+    let template = format!(
+        "{kind_kw} {op_title}{sig} {{\n  {name}{call_args}{selection}\n}}\n",
+        name = op.name,
+    );
+    (template, vars_json)
+}
+
+fn capitalize(s: &str) -> String {
+    let mut chars = s.chars();
+    chars
+        .next()
+        .map(|c| c.to_uppercase().chain(chars).collect::<String>())
+        .unwrap_or_default()
+}
+
+fn placeholder_for(type_name: &str) -> Value {
+    let base = type_name.trim_end_matches('!').trim_end_matches('!');
+    let base = base.trim_start_matches('[').trim_end_matches(']');
+    match base {
+        "Int" | "Float" => Value::from(0),
+        "Boolean" => Value::from(false),
+        _ => Value::from(""),
     }
 }
 
@@ -215,12 +302,21 @@ fn parse_introspection(body: &str) -> Result<Vec<GqlOperation>, String> {
             if t.get("name").and_then(Value::as_str) == Some(type_name.as_str()) {
                 if let Some(fields) = t.get("fields").and_then(Value::as_array) {
                     for f in fields {
-                        if let Some(name) = f.get("name").and_then(Value::as_str) {
-                            ops.push(GqlOperation {
-                                kind: kind.clone(),
-                                name: name.to_owned(),
-                            });
-                        }
+                        let Some(name) = f.get("name").and_then(Value::as_str) else {
+                            continue;
+                        };
+                        let args = parse_args(f.get("args"));
+                        let ret_type = unwrap_named_type(f.get("type"));
+                        let return_fields = ret_type
+                            .as_deref()
+                            .map(|n| fields_of_type(types, n))
+                            .unwrap_or_default();
+                        ops.push(GqlOperation {
+                            kind: kind.clone(),
+                            name: name.to_owned(),
+                            args,
+                            return_fields,
+                        });
                     }
                 }
                 break;
@@ -232,4 +328,71 @@ fn parse_introspection(body: &str) -> Result<Vec<GqlOperation>, String> {
         return Err("schema has no operations".to_owned());
     }
     Ok(ops)
+}
+
+fn parse_args(value: Option<&Value>) -> Vec<GqlArg> {
+    let Some(arr) = value.and_then(Value::as_array) else {
+        return Vec::new();
+    };
+    arr.iter()
+        .filter_map(|a| {
+            let name = a.get("name").and_then(Value::as_str)?.to_owned();
+            let type_name = render_type(a.get("type"));
+            Some(GqlArg { name, type_name })
+        })
+        .collect()
+}
+
+/// Renders a type ref into a GraphQL type literal like `String!` or `[Int!]!`.
+fn render_type(value: Option<&Value>) -> String {
+    let Some(v) = value else {
+        return "String".to_owned();
+    };
+    let kind = v.get("kind").and_then(Value::as_str).unwrap_or("");
+    let name = v.get("name").and_then(Value::as_str);
+    match kind {
+        "NON_NULL" => format!("{}!", render_type(v.get("ofType"))),
+        "LIST" => format!("[{}]", render_type(v.get("ofType"))),
+        _ => name.unwrap_or("String").to_owned(),
+    }
+}
+
+/// Returns the named base type (peels `NON_NULL` and `LIST` wrappers).
+fn unwrap_named_type(value: Option<&Value>) -> Option<String> {
+    let mut cur = value?;
+    loop {
+        let kind = cur.get("kind").and_then(Value::as_str).unwrap_or("");
+        if kind == "NON_NULL" || kind == "LIST" {
+            cur = cur.get("ofType")?;
+        } else {
+            return cur.get("name").and_then(Value::as_str).map(str::to_owned);
+        }
+    }
+}
+
+/// Returns the list of scalar/leaf field names of a named OBJECT type, capped
+/// to keep the template readable. Skips fields that themselves take args.
+fn fields_of_type(types: &[Value], type_name: &str) -> Vec<String> {
+    for t in types {
+        if t.get("name").and_then(Value::as_str) != Some(type_name) {
+            continue;
+        }
+        let Some(fields) = t.get("fields").and_then(Value::as_array) else {
+            return Vec::new();
+        };
+        return fields
+            .iter()
+            .filter_map(|f| {
+                if f.get("args")
+                    .and_then(Value::as_array)
+                    .is_some_and(|a| !a.is_empty())
+                {
+                    return None;
+                }
+                f.get("name").and_then(Value::as_str).map(str::to_owned)
+            })
+            .take(8)
+            .collect();
+    }
+    Vec::new()
 }
