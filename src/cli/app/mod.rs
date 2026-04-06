@@ -7,8 +7,10 @@ mod popups_send;
 mod sidebar;
 mod url_utils;
 mod vars_search;
+mod ws;
 
 pub use kv_editor::KvEditorState;
+pub use ws::{WsDirection, WsState, WsStatus};
 
 use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver};
@@ -330,6 +332,7 @@ pub struct App {
     pub cookies: CookiesState,
     pub extractors: ExtractorsState,
     pub assertions: AssertionsState,
+    pub ws: WsState,
     pub ui: SettingsView,
     pub follow_redirects: bool,
     pub update_available: Option<String>,

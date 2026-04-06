@@ -182,6 +182,7 @@ fn run(
         }
 
         app.poll_pending();
+        app.poll_ws();
         app.poll_update_check();
     }
 }
@@ -275,6 +276,8 @@ fn try_dispatch_editing(app: &mut App, key: &event::KeyEvent) -> bool {
         handle_sidebar_edit_key(app, key.code);
     } else if app.request.editing_url {
         handle_url_edit_key(app, key.code);
+    } else if app.ws.input_editing {
+        handle_ws_input_key(app, key.code);
     } else if app.request.editing_body {
         handle_body_edit_key(app, key.code);
     } else {
@@ -391,7 +394,12 @@ fn handle_url_edit_key(app: &mut App, key: KeyCode) {
         KeyCode::Esc => app.finish_url_edit(),
         KeyCode::Enter => {
             app.finish_url_edit();
-            app.send_request();
+            if app.request_url_is_ws() {
+                app.ws_connect();
+                app.ui.focus = Focus::Response;
+            } else {
+                app.send_request();
+            }
         }
         KeyCode::Backspace => app.url_backspace(),
         KeyCode::Delete => app.url_delete(),
@@ -400,6 +408,21 @@ fn handle_url_edit_key(app: &mut App, key: KeyCode) {
         KeyCode::Home => app.url_cursor_home(),
         KeyCode::End => app.url_cursor_end(),
         KeyCode::Char(c) => app.url_insert(c),
+        _ => {}
+    }
+}
+
+fn handle_ws_input_key(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Esc => app.ws.input_editing = false,
+        KeyCode::Enter => {
+            app.ws_send_input();
+            app.ws.input_editing = false;
+        }
+        KeyCode::Backspace => {
+            app.ws.input.pop();
+        }
+        KeyCode::Char(c) => app.ws.input.push(c),
         _ => {}
     }
 }
@@ -847,12 +870,40 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('C') => app.open_cookies_popup(),
             KeyCode::Char('X') => app.open_extractors_popup(),
             KeyCode::Char('V') => app.open_assertions_popup(),
-            KeyCode::Enter => app.send_request(),
+            KeyCode::Enter => {
+                if app.request_url_is_ws() {
+                    app.ws_connect();
+                    app.ui.focus = Focus::Response;
+                } else {
+                    app.send_request();
+                }
+            }
             KeyCode::Tab => app.ui.focus = Focus::Body,
             KeyCode::BackTab => app.ui.focus = Focus::Sidebar,
             _ => {}
         },
         Focus::Body => return handle_request_panel_key(app, key),
+        Focus::Response if app.ws_active() => match key {
+            KeyCode::Char('q') => return true,
+            KeyCode::Char('s') => app.ui.view = View::Settings,
+            KeyCode::Char('i' | 'e') => {
+                if matches!(app.ws.status, app::WsStatus::Connected) {
+                    app.ws.input_editing = true;
+                }
+            }
+            KeyCode::Char('d') => app.ws_disconnect(),
+            KeyCode::Char('c') => app.ws_clear_stream(),
+            KeyCode::Char('x') => app.ws_reset(),
+            KeyCode::Char('j') | KeyCode::Down => {
+                app.ws.scroll = app.ws.scroll.saturating_add(1);
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                app.ws.scroll = app.ws.scroll.saturating_sub(1);
+            }
+            KeyCode::Tab => app.ui.focus = Focus::Sidebar,
+            KeyCode::BackTab => app.ui.focus = Focus::UrlBar,
+            _ => {}
+        },
         Focus::Response => match key {
             KeyCode::Char('q') => return true,
             KeyCode::Char('s') => app.ui.view = View::Settings,

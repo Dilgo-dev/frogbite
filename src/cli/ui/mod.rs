@@ -3,6 +3,7 @@ mod request;
 mod response;
 mod settings;
 mod sidebar;
+mod ws;
 
 use ratatui::{prelude::*, widgets::Paragraph};
 
@@ -70,7 +71,11 @@ fn draw_main(frame: &mut Frame, app: &App) {
 
     request::draw_url_bar(frame, app, content_layout[0]);
     request::draw_request_panel(frame, app, content_layout[1]);
-    response::draw_response(frame, app, content_layout[2]);
+    if app.ws_active() {
+        ws::draw_ws_panel(frame, app, content_layout[2]);
+    } else {
+        response::draw_response(frame, app, content_layout[2]);
+    }
 
     if app.method_popup.open {
         modals::draw_method_popup(frame, app);
@@ -113,11 +118,16 @@ fn draw_main(frame: &mut Frame, app: &App) {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn draw_help_bar(frame: &mut Frame, app: &App) {
     let area = frame.area();
     let help_area = Rect::new(0, area.height.saturating_sub(1), area.width, 1);
 
-    let help = if app.response.searching {
+    let help = if app.ws.input_editing {
+        "type message  Enter:send  Esc:cancel"
+    } else if app.ws_active() && app.ui.focus == Focus::Response {
+        "i:type  Enter:send  d:disconnect  c:clear  x:close  j/k:scroll"
+    } else if app.response.searching {
         "type search term  Enter:search  Esc:cancel"
     } else if app.auth.editing {
         "type value  Tab:switch  Enter:save  Esc:cancel"
