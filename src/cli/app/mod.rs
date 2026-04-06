@@ -467,14 +467,19 @@ impl App {
             self.extractor_editor.selected = 0;
             self.extractor_editor.editing = false;
             self.assertions.clone_from(&req.assertions);
-            self.assertion_results.clear();
+            self.assertion_results
+                .clone_from(&req.last_assertion_results);
             self.assertions_selected = 0;
+            self.response = match (&req.last_response, &req.last_error) {
+                (Some(r), _) => Some(Ok(r.clone())),
+                (None, Some(e)) => Some(Err(e.clone())),
+                _ => None,
+            };
             self.form_editor.selected = 0;
             self.form_editor.editing = false;
             self.cursor_pos = self.url.len();
             self.body_row = 0;
             self.body_col = 0;
-            self.response = None;
             self.response_scroll = 0;
             self.active_request_id = Some(id.to_owned());
             self.sync_headers_from_map();
@@ -672,6 +677,9 @@ impl App {
             tls_min_version: String::new(),
             extractors: Vec::new(),
             assertions: Vec::new(),
+            last_response: None,
+            last_error: None,
+            last_assertion_results: Vec::new(),
         };
 
         let id = req.id.clone();
@@ -726,6 +734,9 @@ impl App {
                 tls_min_version: req.tls_min_version,
                 extractors: req.extractors,
                 assertions: req.assertions,
+                last_response: req.last_response,
+                last_error: req.last_error,
+                last_assertion_results: req.last_assertion_results,
             };
             let id = new_req.id.clone();
             self.requests.push(new_req);
@@ -998,6 +1009,9 @@ impl App {
             tls_min_version: String::new(),
             extractors: Vec::new(),
             assertions: Vec::new(),
+            last_response: None,
+            last_error: None,
+            last_assertion_results: Vec::new(),
         };
 
         let id = req.id.clone();
@@ -1882,6 +1896,24 @@ impl App {
         });
     }
 
+    fn persist_last_response(&mut self) {
+        let Some(id) = self.active_request_id.clone() else {
+            return;
+        };
+        let (last_response, last_error) = match &self.response {
+            Some(Ok(r)) => (Some(r.clone()), None),
+            Some(Err(e)) => (None, Some(e.clone())),
+            None => (None, None),
+        };
+        let last_assertion_results = self.assertion_results.clone();
+        if let Some(req) = self.requests.iter_mut().find(|r| r.id == id) {
+            req.last_response = last_response;
+            req.last_error = last_error;
+            req.last_assertion_results = last_assertion_results;
+        }
+        self.save_collections();
+    }
+
     pub fn poll_pending(&mut self) -> bool {
         let Some(pending) = self.pending.as_ref() else {
             return false;
@@ -1922,6 +1954,7 @@ impl App {
                 history::append(entry);
                 self.response = Some(result);
                 self.loading = false;
+                self.persist_last_response();
                 true
             }
             Err(mpsc::TryRecvError::Empty) => false,
@@ -2048,6 +2081,9 @@ fn default_collection() -> CollectionData {
                 tls_min_version: String::new(),
                 extractors: Vec::new(),
                 assertions: Vec::new(),
+                last_response: None,
+                last_error: None,
+                last_assertion_results: Vec::new(),
             },
             SavedRequest {
                 id: collections::new_id(),
@@ -2071,6 +2107,9 @@ fn default_collection() -> CollectionData {
                 tls_min_version: String::new(),
                 extractors: Vec::new(),
                 assertions: Vec::new(),
+                last_response: None,
+                last_error: None,
+                last_assertion_results: Vec::new(),
             },
         ],
         active_request_id: None,

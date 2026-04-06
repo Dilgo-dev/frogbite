@@ -2,7 +2,10 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+use frogbite::core::http::HttpResponse;
 use serde::{Deserialize, Serialize};
+
+use crate::assertions::AssertionResult;
 
 /// Authentication configuration for a request.
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
@@ -126,6 +129,12 @@ pub struct SavedRequest {
     pub extractors: Vec<(String, String)>,
     #[serde(default)]
     pub assertions: Vec<String>,
+    #[serde(default)]
+    pub last_response: Option<HttpResponse>,
+    #[serde(default)]
+    pub last_error: Option<String>,
+    #[serde(default)]
+    pub last_assertion_results: Vec<AssertionResult>,
 }
 
 pub const fn default_timeout() -> u64 {

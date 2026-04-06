@@ -137,6 +137,9 @@ fn process_item(
             tls_min_version: String::new(),
             extractors: Vec::new(),
             assertions: Vec::new(),
+            last_response: None,
+            last_error: None,
+            last_assertion_results: Vec::new(),
         });
     }
 }

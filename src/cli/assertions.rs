@@ -1,7 +1,8 @@
 use frogbite::core::http::HttpResponse;
+use serde::{Deserialize, Serialize};
 
 /// Result of evaluating a single assertion against a response.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssertionResult {
     #[allow(dead_code)]
     pub expression: String,
