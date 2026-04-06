@@ -18,7 +18,6 @@ use crossterm::{
 };
 use ratatui::{prelude::*, widgets::Paragraph};
 
-#[allow(unused_imports)]
 use app::{App, Focus, Method, RequestTab, ResponseTab, View};
 
 fn main() -> io::Result<()> {

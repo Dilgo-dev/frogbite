@@ -4,8 +4,6 @@ use serde::{Deserialize, Serialize};
 /// Result of evaluating a single assertion against a response.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssertionResult {
-    #[allow(dead_code)]
-    pub expression: String,
     pub passed: bool,
     pub message: String,
 }
@@ -22,15 +20,12 @@ pub fn evaluate_all(assertions: &[String], response: &HttpResponse) -> Vec<Asser
 
 fn evaluate(raw: &str, response: &HttpResponse) -> AssertionResult {
     let expr = raw.trim();
-    let outcome = parse_and_run(expr, response);
-    match outcome {
+    match parse_and_run(expr, response) {
         Ok(message) => AssertionResult {
-            expression: raw.to_owned(),
             passed: true,
             message,
         },
         Err(message) => AssertionResult {
-            expression: raw.to_owned(),
             passed: false,
             message,
         },
