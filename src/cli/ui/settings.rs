@@ -2,17 +2,17 @@ use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Paragraph};
 
 use super::*;
-use crate::app::App;
+use crate::app::{App, SettingDisplay};
 
 pub(super) fn draw_settings(frame: &mut Frame, app: &App) {
     let area = frame.area();
 
     let block = Block::default()
         .title(" Settings ")
-        .title_style(Style::default().fg(GREEN).bold())
+        .title_style(Style::default().fg(green()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(GREEN))
-        .bg(BG);
+        .border_style(Style::default().fg(green()))
+        .bg(bg());
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -29,23 +29,26 @@ pub(super) fn draw_settings(frame: &mut Frame, app: &App) {
         let row_area = Rect::new(inner.x, y, inner.width, 1);
 
         if selected {
-            frame.render_widget(Paragraph::new("").bg(SURFACE), row_area);
+            frame.render_widget(Paragraph::new("").bg(surface()), row_area);
         }
 
         let indicator = if selected { "> " } else { "  " };
-        let toggle = if *value { "[x]" } else { "[ ]" };
-        let toggle_color = if *value { GREEN } else { MUTED };
+        let (display, display_color) = match value {
+            SettingDisplay::Toggle(true) => ("[on] ".to_owned(), green()),
+            SettingDisplay::Toggle(false) => ("[off]".to_owned(), muted()),
+            SettingDisplay::Choice(v) => (format!("< {v} >"), teal()),
+        };
 
         let line = Line::from(vec![
-            Span::styled(indicator, Style::default().fg(GREEN)),
-            Span::styled(toggle, Style::default().fg(toggle_color).bold()),
+            Span::styled(indicator, Style::default().fg(green())),
+            Span::styled(display, Style::default().fg(display_color).bold()),
             Span::raw("  "),
             Span::styled(
                 *label,
                 if selected {
-                    Style::default().fg(FG)
+                    Style::default().fg(fg())
                 } else {
-                    Style::default().fg(MUTED)
+                    Style::default().fg(muted())
                 },
             ),
         ]);

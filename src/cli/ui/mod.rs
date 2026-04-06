@@ -3,6 +3,7 @@ mod request;
 mod response;
 mod settings;
 mod sidebar;
+pub mod theme;
 mod ws;
 
 use ratatui::{prelude::*, widgets::Paragraph};
@@ -10,38 +11,70 @@ use ratatui::{prelude::*, widgets::Paragraph};
 use crate::app::{App, Focus, Method, RequestTab, View};
 use crate::collections::BodyType;
 
-pub const GREEN: Color = Color::Rgb(124, 179, 66);
-pub const ORANGE: Color = Color::Rgb(255, 111, 0);
-pub const PURPLE: Color = Color::Rgb(156, 39, 176);
-pub const RED: Color = Color::Rgb(211, 47, 47);
-pub const YELLOW: Color = Color::Rgb(255, 143, 0);
-pub const TEAL: Color = Color::Rgb(0, 137, 123);
-pub const MUTED: Color = Color::Rgb(107, 138, 107);
-pub const SURFACE: Color = Color::Rgb(22, 34, 32);
-pub const BG: Color = Color::Rgb(13, 27, 26);
-pub const FG: Color = Color::Rgb(232, 232, 224);
+#[inline]
+pub fn green() -> Color {
+    theme::theme().green
+}
+#[inline]
+pub fn orange() -> Color {
+    theme::theme().orange
+}
+#[inline]
+pub fn purple() -> Color {
+    theme::theme().purple
+}
+#[inline]
+pub fn red() -> Color {
+    theme::theme().red
+}
+#[inline]
+pub fn yellow() -> Color {
+    theme::theme().yellow
+}
+#[inline]
+pub fn teal() -> Color {
+    theme::theme().teal
+}
+#[inline]
+pub fn muted() -> Color {
+    theme::theme().muted
+}
+#[inline]
+pub fn surface() -> Color {
+    theme::theme().surface
+}
+#[inline]
+pub fn bg() -> Color {
+    theme::theme().bg
+}
+#[inline]
+pub fn fg() -> Color {
+    theme::theme().fg
+}
 
-pub const fn method_color(method: &Method) -> Color {
+pub fn method_color(method: &Method) -> Color {
+    let t = theme::theme();
     match method {
-        Method::Get => GREEN,
-        Method::Post => ORANGE,
-        Method::Put => PURPLE,
-        Method::Patch => YELLOW,
-        Method::Delete => RED,
-        Method::Head => TEAL,
-        Method::Options => MUTED,
+        Method::Get => t.green,
+        Method::Post => t.orange,
+        Method::Put => t.purple,
+        Method::Patch => t.yellow,
+        Method::Delete => t.red,
+        Method::Head => t.teal,
+        Method::Options => t.muted,
         Method::Grpc => Color::Rgb(0, 188, 212),
         Method::Graphql => Color::Rgb(225, 0, 152),
     }
 }
 
-pub const fn status_color(status: u16) -> Color {
+pub fn status_color(status: u16) -> Color {
+    let t = theme::theme();
     match status {
-        200..=299 => GREEN,
-        300..=399 => TEAL,
-        400..=499 => YELLOW,
-        500..=599 => RED,
-        _ => MUTED,
+        200..=299 => t.green,
+        300..=399 => t.teal,
+        400..=499 => t.yellow,
+        500..=599 => t.red,
+        _ => t.muted,
     }
 }
 
@@ -251,7 +284,7 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
         }
     };
 
-    let mut spans = vec![Span::styled(help, Style::default().fg(MUTED))];
+    let mut spans = vec![Span::styled(help, Style::default().fg(muted()))];
     if let Some(v) = &app.update_available {
         spans.push(Span::raw("  "));
         spans.push(Span::styled(
@@ -259,5 +292,5 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
             Style::default().fg(Color::Rgb(255, 111, 0)),
         ));
     }
-    frame.render_widget(Paragraph::new(Line::from(spans)).bg(SURFACE), help_area);
+    frame.render_widget(Paragraph::new(Line::from(spans)).bg(surface()), help_area);
 }

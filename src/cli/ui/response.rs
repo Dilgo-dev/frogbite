@@ -35,9 +35,9 @@ pub(super) fn draw_response(frame: &mut Frame, app: &App, area: Rect) {
 fn draw_search_bar(frame: &mut Frame, app: &App, area: Rect) {
     let is_focused = app.ui.focus == Focus::Response;
     let border_style = if is_focused {
-        Style::default().fg(GREEN)
+        Style::default().fg(green())
     } else {
-        Style::default().fg(MUTED)
+        Style::default().fg(muted())
     };
 
     let display = if app.response.searching {
@@ -49,13 +49,17 @@ fn draw_search_bar(frame: &mut Frame, app: &App, area: Rect) {
     let line = Line::from(vec![
         Span::styled(
             display,
-            Style::default().fg(if app.response.searching { GREEN } else { MUTED }),
+            Style::default().fg(if app.response.searching {
+                green()
+            } else {
+                muted()
+            }),
         ),
-        Span::styled("  n:next  N:prev  Esc:clear", Style::default().fg(MUTED)),
+        Span::styled("  n:next  N:prev  Esc:clear", Style::default().fg(muted())),
     ]);
 
     frame.render_widget(
-        Paragraph::new(line).bg(SURFACE).block(
+        Paragraph::new(line).bg(surface()).block(
             Block::default()
                 .borders(Borders::LEFT | Borders::RIGHT)
                 .border_style(border_style),
@@ -71,34 +75,34 @@ fn draw_response_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             let mut spans = vec![
                 Span::styled(
                     format!(" {} ", resp.status_text),
-                    Style::default().fg(BG).bg(color).bold(),
+                    Style::default().fg(bg()).bg(color).bold(),
                 ),
                 Span::raw("  "),
                 Span::styled(
                     format!("{}ms", resp.duration_ms),
-                    Style::default().fg(MUTED),
+                    Style::default().fg(muted()),
                 ),
                 Span::raw("  "),
-                Span::styled(format_size(resp.body.len()), Style::default().fg(MUTED)),
+                Span::styled(format_size(resp.body.len()), Style::default().fg(muted())),
                 if resp.redirect_chain.is_empty() {
                     Span::raw("")
                 } else {
                     Span::styled(
                         format!("  \u{21aa}{}", resp.redirect_chain.len()),
-                        Style::default().fg(TEAL),
+                        Style::default().fg(teal()),
                     )
                 },
                 Span::raw("    "),
                 if app.response.tab == ResponseTab::Body {
-                    Span::styled("Body", Style::default().fg(GREEN).bold().underlined())
+                    Span::styled("Body", Style::default().fg(green()).bold().underlined())
                 } else {
-                    Span::styled("Body", Style::default().fg(MUTED))
+                    Span::styled("Body", Style::default().fg(muted()))
                 },
                 Span::raw("  "),
                 if app.response.tab == ResponseTab::Headers {
-                    Span::styled("Headers", Style::default().fg(GREEN).bold().underlined())
+                    Span::styled("Headers", Style::default().fg(green()).bold().underlined())
                 } else {
-                    Span::styled("Headers", Style::default().fg(MUTED))
+                    Span::styled("Headers", Style::default().fg(muted()))
                 },
             ];
             if !app.assertions.results.is_empty() {
@@ -111,27 +115,32 @@ fn draw_response_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                         "{} {passed}/{total}",
                         if all_ok { "\u{2713}" } else { "\u{2717}" }
                     ),
-                    Style::default().fg(if all_ok { GREEN } else { RED }).bold(),
+                    Style::default()
+                        .fg(if all_ok { green() } else { red() })
+                        .bold(),
                 ));
             }
             if let Some(msg) = &app.response.clipboard_msg {
                 spans.push(Span::raw("    "));
-                spans.push(Span::styled(msg, Style::default().fg(GREEN).bold()));
+                spans.push(Span::styled(msg, Style::default().fg(green()).bold()));
             }
             Line::from(spans)
         }
         Some(Err(_)) => Line::from(vec![Span::styled(
             " ERROR ",
-            Style::default().fg(BG).bg(RED).bold(),
+            Style::default().fg(bg()).bg(red()).bold(),
         )]),
         None if app.response.loading => Line::from(vec![Span::styled(
             " Sending... ",
-            Style::default().fg(YELLOW),
+            Style::default().fg(yellow()),
         )]),
-        None => Line::from(vec![Span::styled(" Response ", Style::default().fg(MUTED))]),
+        None => Line::from(vec![Span::styled(
+            " Response ",
+            Style::default().fg(muted()),
+        )]),
     };
 
-    frame.render_widget(Paragraph::new(status_line).bg(SURFACE), area);
+    frame.render_widget(Paragraph::new(status_line).bg(surface()), area);
 }
 
 fn draw_response_content(frame: &mut Frame, app: &App, area: Rect) {
@@ -140,11 +149,11 @@ fn draw_response_content(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
         .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
         .border_style(if is_focused {
-            Style::default().fg(GREEN)
+            Style::default().fg(green())
         } else {
-            Style::default().fg(MUTED)
+            Style::default().fg(muted())
         })
-        .bg(BG);
+        .bg(bg());
 
     let inner = block.inner(area);
 
@@ -154,21 +163,21 @@ fn draw_response_content(frame: &mut Frame, app: &App, area: Rect) {
             if !resp.redirect_chain.is_empty() {
                 lines.push(Line::from(Span::styled(
                     format!("Redirect chain ({}):", resp.redirect_chain.len()),
-                    Style::default().fg(TEAL).bold(),
+                    Style::default().fg(teal()).bold(),
                 )));
                 for (i, url) in resp.redirect_chain.iter().enumerate() {
                     lines.push(Line::from(vec![
-                        Span::styled(format!("  {}. ", i + 1), Style::default().fg(MUTED)),
-                        Span::styled(url, Style::default().fg(FG)),
+                        Span::styled(format!("  {}. ", i + 1), Style::default().fg(muted())),
+                        Span::styled(url, Style::default().fg(fg())),
                     ]));
                 }
                 lines.push(Line::default());
             }
             lines.extend(resp.headers.iter().map(|(k, v)| {
                 Line::from(vec![
-                    Span::styled(k, Style::default().fg(MUTED)),
-                    Span::styled(": ", Style::default().fg(MUTED)),
-                    Span::styled(v, Style::default().fg(FG)),
+                    Span::styled(k, Style::default().fg(muted())),
+                    Span::styled(": ", Style::default().fg(muted())),
+                    Span::styled(v, Style::default().fg(fg())),
                 ])
             }));
             let paragraph = Paragraph::new(Text::from(lines))
@@ -187,7 +196,7 @@ fn draw_response_content(frame: &mut Frame, app: &App, area: Rect) {
                 .map(|(i, line)| {
                     let mut spans = vec![Span::styled(
                         format!("{:>3} ", i + 1),
-                        Style::default().fg(MUTED),
+                        Style::default().fg(muted()),
                     )];
                     if !search.is_empty()
                         && line
@@ -198,7 +207,7 @@ fn draw_response_content(frame: &mut Frame, app: &App, area: Rect) {
                     } else if is_json {
                         spans.extend(highlight_json_line(line));
                     } else {
-                        spans.push(Span::styled(line, Style::default().fg(FG)));
+                        spans.push(Span::styled(line, Style::default().fg(fg())));
                     }
                     Line::from(spans)
                 })
@@ -215,7 +224,7 @@ fn draw_response_content(frame: &mut Frame, app: &App, area: Rect) {
                     .position(app.response.scroll as usize);
                 frame.render_stateful_widget(
                     Scrollbar::new(ScrollbarOrientation::VerticalRight)
-                        .thumb_style(Style::default().fg(MUTED)),
+                        .thumb_style(Style::default().fg(muted())),
                     inner,
                     &mut scrollbar_state,
                 );
@@ -227,9 +236,10 @@ fn draw_response_content(frame: &mut Frame, app: &App, area: Rect) {
             } else {
                 "Press Enter to send a request"
             };
-            let paragraph = Paragraph::new(Text::styled(msg, Style::default().fg(MUTED).italic()))
-                .block(block)
-                .alignment(Alignment::Center);
+            let paragraph =
+                Paragraph::new(Text::styled(msg, Style::default().fg(muted()).italic()))
+                    .block(block)
+                    .alignment(Alignment::Center);
             frame.render_widget(paragraph, area);
         }
     }
@@ -245,17 +255,17 @@ fn highlight_search_in_line<'a>(line: &'a str, needle: &str) -> Vec<Span<'a>> {
         let start = pos + idx;
         let end = start + needle.len();
         if start > pos {
-            spans.push(Span::styled(&line[pos..start], Style::default().fg(FG)));
+            spans.push(Span::styled(&line[pos..start], Style::default().fg(fg())));
         }
         spans.push(Span::styled(
             &line[start..end],
-            Style::default().fg(BG).bg(YELLOW).bold(),
+            Style::default().fg(bg()).bg(yellow()).bold(),
         ));
         pos = end;
     }
 
     if pos < line.len() {
-        spans.push(Span::styled(&line[pos..], Style::default().fg(FG)));
+        spans.push(Span::styled(&line[pos..], Style::default().fg(fg())));
     }
 
     spans
@@ -267,7 +277,7 @@ fn highlight_json_line(line: &str) -> Vec<Span<'_>> {
     let mut spans = Vec::new();
 
     if indent > 0 {
-        spans.push(Span::styled(&line[..indent], Style::default().fg(FG)));
+        spans.push(Span::styled(&line[..indent], Style::default().fg(fg())));
     }
 
     if trimmed.is_empty() {
@@ -278,16 +288,19 @@ fn highlight_json_line(line: &str) -> Vec<Span<'_>> {
 
     match first {
         b'{' | b'}' | b'[' | b']' => {
-            spans.push(Span::styled(trimmed, Style::default().fg(MUTED)));
+            spans.push(Span::styled(trimmed, Style::default().fg(muted())));
         }
         b'"' => {
             if let Some(colon_pos) = trimmed.find("\": ").or_else(|| trimmed.find("\":")) {
                 let key_end = colon_pos + 1;
-                spans.push(Span::styled(&trimmed[..key_end], Style::default().fg(TEAL)));
+                spans.push(Span::styled(
+                    &trimmed[..key_end],
+                    Style::default().fg(teal()),
+                ));
                 let rest = &trimmed[key_end..];
                 spans.extend(highlight_json_value(rest));
             } else {
-                spans.push(Span::styled(trimmed, Style::default().fg(ORANGE)));
+                spans.push(Span::styled(trimmed, Style::default().fg(orange())));
             }
         }
         b'0'..=b'9' | b'-' => {
@@ -298,12 +311,12 @@ fn highlight_json_line(line: &str) -> Vec<Span<'_>> {
                 .unwrap_or(trimmed.len());
             spans.push(Span::styled(
                 &trimmed[..num_end],
-                Style::default().fg(PURPLE),
+                Style::default().fg(purple()),
             ));
             if num_end < trimmed.len() {
                 spans.push(Span::styled(
                     &trimmed[num_end..],
-                    Style::default().fg(MUTED),
+                    Style::default().fg(muted()),
                 ));
             }
         }
@@ -313,12 +326,12 @@ fn highlight_json_line(line: &str) -> Vec<Span<'_>> {
                 .unwrap_or(trimmed.len());
             spans.push(Span::styled(
                 &trimmed[..word_end],
-                Style::default().fg(YELLOW),
+                Style::default().fg(yellow()),
             ));
             if word_end < trimmed.len() {
                 spans.push(Span::styled(
                     &trimmed[word_end..],
-                    Style::default().fg(MUTED),
+                    Style::default().fg(muted()),
                 ));
             }
         }
@@ -328,17 +341,17 @@ fn highlight_json_line(line: &str) -> Vec<Span<'_>> {
                 .unwrap_or(trimmed.len());
             spans.push(Span::styled(
                 &trimmed[..word_end],
-                Style::default().fg(MUTED).italic(),
+                Style::default().fg(muted()).italic(),
             ));
             if word_end < trimmed.len() {
                 spans.push(Span::styled(
                     &trimmed[word_end..],
-                    Style::default().fg(MUTED),
+                    Style::default().fg(muted()),
                 ));
             }
         }
         _ => {
-            spans.push(Span::styled(trimmed, Style::default().fg(FG)));
+            spans.push(Span::styled(trimmed, Style::default().fg(fg())));
         }
     }
 
@@ -351,7 +364,7 @@ fn highlight_json_value(rest: &str) -> Vec<Span<'_>> {
     let mut spans = Vec::new();
 
     if ws_len > 0 {
-        spans.push(Span::styled(&rest[..ws_len], Style::default().fg(FG)));
+        spans.push(Span::styled(&rest[..ws_len], Style::default().fg(fg())));
     }
 
     if trimmed.is_empty() {
@@ -361,12 +374,12 @@ fn highlight_json_value(rest: &str) -> Vec<Span<'_>> {
     let first = trimmed.as_bytes().first().copied().unwrap_or(0);
 
     match first {
-        b'"' => spans.push(Span::styled(trimmed, Style::default().fg(ORANGE))),
-        b'0'..=b'9' | b'-' => spans.push(Span::styled(trimmed, Style::default().fg(PURPLE))),
-        b't' | b'f' => spans.push(Span::styled(trimmed, Style::default().fg(YELLOW))),
-        b'n' => spans.push(Span::styled(trimmed, Style::default().fg(MUTED).italic())),
-        b'{' | b'[' => spans.push(Span::styled(trimmed, Style::default().fg(MUTED))),
-        _ => spans.push(Span::styled(trimmed, Style::default().fg(FG))),
+        b'"' => spans.push(Span::styled(trimmed, Style::default().fg(orange()))),
+        b'0'..=b'9' | b'-' => spans.push(Span::styled(trimmed, Style::default().fg(purple()))),
+        b't' | b'f' => spans.push(Span::styled(trimmed, Style::default().fg(yellow()))),
+        b'n' => spans.push(Span::styled(trimmed, Style::default().fg(muted()).italic())),
+        b'{' | b'[' => spans.push(Span::styled(trimmed, Style::default().fg(muted()))),
+        _ => spans.push(Span::styled(trimmed, Style::default().fg(fg()))),
     }
 
     spans

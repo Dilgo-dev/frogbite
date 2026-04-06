@@ -57,6 +57,7 @@ fn main() -> ExitCode {
 
 fn run_tui() -> io::Result<()> {
     let s = settings::load();
+    ui::theme::init(&s.theme);
 
     let update_rx = if s.update_check {
         let (tx, rx) = std::sync::mpsc::channel();

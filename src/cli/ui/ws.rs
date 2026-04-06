@@ -1,7 +1,7 @@
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Paragraph};
 
-use super::{BG, FG, GREEN, MUTED, ORANGE, RED, SURFACE, TEAL, YELLOW};
+use super::{bg, fg, green, muted, orange, red, surface, teal, yellow};
 use crate::app::{App, Focus, WsDirection, WsStatus};
 
 pub(super) fn draw_ws_panel(frame: &mut Frame, app: &App, area: Rect) {
@@ -21,22 +21,22 @@ pub(super) fn draw_ws_panel(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_status_bar(frame: &mut Frame, app: &App, area: Rect) {
     let (label, color) = match app.ws.status {
-        WsStatus::Disconnected => (" DISCONNECTED ", MUTED),
-        WsStatus::Connecting => (" CONNECTING ", YELLOW),
-        WsStatus::Connected => (" CONNECTED ", GREEN),
-        WsStatus::Closed => (" CLOSED ", MUTED),
+        WsStatus::Disconnected => (" DISCONNECTED ", muted()),
+        WsStatus::Connecting => (" CONNECTING ", yellow()),
+        WsStatus::Connected => (" CONNECTED ", green()),
+        WsStatus::Closed => (" CLOSED ", muted()),
     };
     let line = Line::from(vec![
-        Span::styled(label, Style::default().fg(BG).bg(color).bold()),
+        Span::styled(label, Style::default().fg(bg()).bg(color).bold()),
         Span::raw("  "),
-        Span::styled("WS", Style::default().fg(TEAL).bold()),
+        Span::styled("WS", Style::default().fg(teal()).bold()),
         Span::raw("  "),
         Span::styled(
             format!("{} msg", app.ws.messages.len()),
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         ),
     ]);
-    frame.render_widget(Paragraph::new(line).bg(SURFACE), area);
+    frame.render_widget(Paragraph::new(line).bg(surface()), area);
 }
 
 fn draw_stream(frame: &mut Frame, app: &App, area: Rect) {
@@ -44,11 +44,11 @@ fn draw_stream(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
         .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
         .border_style(if is_focused {
-            Style::default().fg(GREEN)
+            Style::default().fg(green())
         } else {
-            Style::default().fg(MUTED)
+            Style::default().fg(muted())
         })
-        .bg(BG);
+        .bg(bg());
 
     let lines: Vec<Line> = app
         .ws
@@ -56,16 +56,16 @@ fn draw_stream(frame: &mut Frame, app: &App, area: Rect) {
         .iter()
         .flat_map(|m| {
             let (marker, color) = match m.direction {
-                WsDirection::Sent => ("> ", TEAL),
-                WsDirection::Recv => ("< ", GREEN),
-                WsDirection::Info => ("- ", MUTED),
-                WsDirection::Error => ("! ", RED),
+                WsDirection::Sent => ("> ", teal()),
+                WsDirection::Recv => ("< ", green()),
+                WsDirection::Info => ("- ", muted()),
+                WsDirection::Error => ("! ", red()),
             };
             m.text.lines().enumerate().map(move |(i, line)| {
                 let prefix = if i == 0 { marker } else { "  " };
                 Line::from(vec![
                     Span::styled(prefix, Style::default().fg(color).bold()),
-                    Span::styled(line.to_owned(), Style::default().fg(FG)),
+                    Span::styled(line.to_owned(), Style::default().fg(fg())),
                 ])
             })
         })
@@ -79,7 +79,7 @@ fn draw_stream(frame: &mut Frame, app: &App, area: Rect) {
 
 fn draw_input(frame: &mut Frame, app: &App, area: Rect) {
     let editing = app.ws.input_editing;
-    let border_color = if editing { ORANGE } else { MUTED };
+    let border_color = if editing { orange() } else { muted() };
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(border_color))
@@ -87,7 +87,7 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect) {
             " message ",
             Style::default().fg(border_color).bold(),
         ))
-        .bg(BG);
+        .bg(bg());
 
     let content = if editing {
         format!("{}\u{2588}", app.ws.input)
@@ -101,11 +101,11 @@ fn draw_input(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     let color = if editing {
-        FG
+        fg()
     } else if app.ws.input.is_empty() {
-        MUTED
+        muted()
     } else {
-        FG
+        fg()
     };
 
     frame.render_widget(

@@ -66,13 +66,23 @@ impl App {
 
     // -- Settings --
 
-    pub fn settings_items(&self) -> Vec<(&str, bool)> {
+    pub fn settings_items(&self) -> Vec<(&'static str, SettingDisplay)> {
         vec![
-            ("Splash animation", self.ui.settings.splash_animation),
-            ("Vim keys", self.ui.settings.vim_keys),
+            (
+                "Splash animation",
+                SettingDisplay::Toggle(self.ui.settings.splash_animation),
+            ),
+            (
+                "Vim keys",
+                SettingDisplay::Toggle(self.ui.settings.vim_keys),
+            ),
             (
                 "Check for updates on startup",
-                self.ui.settings.update_check,
+                SettingDisplay::Toggle(self.ui.settings.update_check),
+            ),
+            (
+                "Theme (restart to apply)",
+                SettingDisplay::Choice(self.ui.settings.theme.clone()),
             ),
         ]
     }
@@ -82,6 +92,18 @@ impl App {
             0 => self.ui.settings.splash_animation = !self.ui.settings.splash_animation,
             1 => self.ui.settings.vim_keys = !self.ui.settings.vim_keys,
             2 => self.ui.settings.update_check = !self.ui.settings.update_check,
+            3 => {
+                let names: Vec<&'static str> = crate::ui::theme::ALL_THEMES
+                    .iter()
+                    .map(|t| t.name)
+                    .collect();
+                let idx = names
+                    .iter()
+                    .position(|n| *n == self.ui.settings.theme)
+                    .unwrap_or(0);
+                let next = (idx + 1) % names.len();
+                names[next].clone_into(&mut self.ui.settings.theme);
+            }
             _ => {}
         }
         settings::save(&self.ui.settings);

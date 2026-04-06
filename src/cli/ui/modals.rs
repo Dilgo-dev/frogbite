@@ -18,10 +18,10 @@ pub(super) fn draw_method_popup(frame: &mut Frame, app: &App) {
 
     let block = Block::default()
         .title(" Method ")
-        .title_style(Style::default().fg(GREEN).bold())
+        .title_style(Style::default().fg(green()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(GREEN))
-        .bg(BG);
+        .border_style(Style::default().fg(green()))
+        .bg(bg());
 
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
@@ -35,13 +35,13 @@ pub(super) fn draw_method_popup(frame: &mut Frame, app: &App) {
         let selected = i == app.method_popup.selected;
 
         if selected {
-            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+            frame.render_widget(Paragraph::new("").bg(surface()), row);
         }
 
         let line = Line::from(vec![
             Span::styled(
                 if selected { " > " } else { "   " },
-                Style::default().fg(GREEN),
+                Style::default().fg(green()),
             ),
             Span::styled(
                 method.as_str(),
@@ -65,10 +65,10 @@ pub(super) fn draw_history_overlay(frame: &mut Frame, app: &App) {
 
     let block = Block::default()
         .title(" History ")
-        .title_style(Style::default().fg(GREEN).bold())
+        .title_style(Style::default().fg(green()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(GREEN))
-        .bg(BG);
+        .border_style(Style::default().fg(green()))
+        .bg(bg());
 
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
@@ -76,7 +76,7 @@ pub(super) fn draw_history_overlay(frame: &mut Frame, app: &App) {
     if app.history.entries.is_empty() {
         let msg = Paragraph::new(Text::styled(
             "No history yet",
-            Style::default().fg(MUTED).italic(),
+            Style::default().fg(muted()).italic(),
         ))
         .alignment(Alignment::Center);
         frame.render_widget(msg, inner);
@@ -92,14 +92,14 @@ pub(super) fn draw_history_overlay(frame: &mut Frame, app: &App) {
         let row = Rect::new(inner.x, row_y, inner.width, 1);
 
         if selected {
-            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+            frame.render_widget(Paragraph::new("").bg(surface()), row);
         }
 
         let method = Method::from_str(&entry.method);
         let status_str = entry
             .status
             .map_or_else(|| "ERR".to_owned(), |s| s.to_string());
-        let s_color = entry.status.map_or(RED, status_color);
+        let s_color = entry.status.map_or_else(red, status_color);
         let duration_str = entry
             .duration_ms
             .map_or_else(|| "-".to_owned(), |d| format!("{d}ms"));
@@ -114,7 +114,7 @@ pub(super) fn draw_history_overlay(frame: &mut Frame, app: &App) {
         let line = Line::from(vec![
             Span::styled(
                 if selected { " > " } else { "   " },
-                Style::default().fg(GREEN),
+                Style::default().fg(green()),
             ),
             Span::styled(
                 format!("{status_str:>3}"),
@@ -128,10 +128,10 @@ pub(super) fn draw_history_overlay(frame: &mut Frame, app: &App) {
             Span::raw("  "),
             Span::styled(
                 url_display,
-                Style::default().fg(if selected { FG } else { MUTED }),
+                Style::default().fg(if selected { fg() } else { muted() }),
             ),
             Span::raw("  "),
-            Span::styled(duration_str, Style::default().fg(MUTED)),
+            Span::styled(duration_str, Style::default().fg(muted())),
         ]);
 
         frame.render_widget(Paragraph::new(line), row);
@@ -154,9 +154,9 @@ pub(super) fn draw_curl_import_popup(frame: &mut Frame, app: &App) {
         " Import cURL "
     };
     let title_style = if app.curl_io.import_error {
-        Style::default().fg(RED).bold()
+        Style::default().fg(red()).bold()
     } else {
-        Style::default().fg(GREEN).bold()
+        Style::default().fg(green()).bold()
     };
 
     let block = Block::default()
@@ -164,17 +164,17 @@ pub(super) fn draw_curl_import_popup(frame: &mut Frame, app: &App) {
         .title_style(title_style)
         .borders(Borders::ALL)
         .border_style(if app.curl_io.import_error {
-            Style::default().fg(RED)
+            Style::default().fg(red())
         } else {
-            Style::default().fg(GREEN)
+            Style::default().fg(green())
         })
-        .bg(BG);
+        .bg(bg());
 
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
     let display = format!("{}\u{2588}", &app.curl_io.import_buffer);
-    let paragraph = Paragraph::new(Text::styled(&display, Style::default().fg(FG)))
+    let paragraph = Paragraph::new(Text::styled(&display, Style::default().fg(fg())))
         .wrap(ratatui::widgets::Wrap { trim: false });
     frame.render_widget(paragraph, inner);
 }
@@ -191,17 +191,17 @@ pub(super) fn draw_curl_export_popup(frame: &mut Frame, app: &App) {
 
     let block = Block::default()
         .title(" Export cURL ")
-        .title_style(Style::default().fg(GREEN).bold())
+        .title_style(Style::default().fg(green()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(GREEN))
-        .bg(BG);
+        .border_style(Style::default().fg(green()))
+        .bg(bg());
 
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
     let paragraph = Paragraph::new(Text::styled(
         &app.curl_io.export_content,
-        Style::default().fg(FG),
+        Style::default().fg(fg()),
     ))
     .wrap(ratatui::widgets::Wrap { trim: false });
     frame.render_widget(paragraph, inner);
@@ -223,9 +223,9 @@ pub(super) fn draw_postman_import_popup(frame: &mut Frame, app: &App) {
         " Import Postman "
     };
     let title_style = if app.postman_io.error {
-        Style::default().fg(RED).bold()
+        Style::default().fg(red()).bold()
     } else {
-        Style::default().fg(GREEN).bold()
+        Style::default().fg(green()).bold()
     };
 
     let block = Block::default()
@@ -233,11 +233,11 @@ pub(super) fn draw_postman_import_popup(frame: &mut Frame, app: &App) {
         .title_style(title_style)
         .borders(Borders::ALL)
         .border_style(if app.postman_io.error {
-            Style::default().fg(RED)
+            Style::default().fg(red())
         } else {
-            Style::default().fg(GREEN)
+            Style::default().fg(green())
         })
-        .bg(BG);
+        .bg(bg());
 
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
@@ -246,10 +246,10 @@ pub(super) fn draw_postman_import_popup(frame: &mut Frame, app: &App) {
     let lines = vec![
         Line::from(Span::styled(
             "Path to collection JSON:",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )),
         Line::default(),
-        Line::from(Span::styled(display, Style::default().fg(FG))),
+        Line::from(Span::styled(display, Style::default().fg(fg()))),
     ];
     let paragraph = Paragraph::new(Text::from(lines));
     frame.render_widget(paragraph, inner);
@@ -269,10 +269,10 @@ pub(super) fn draw_env_popup(frame: &mut Frame, app: &App) {
 
     let block = Block::default()
         .title(" Environments ")
-        .title_style(Style::default().fg(TEAL).bold())
+        .title_style(Style::default().fg(teal()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(TEAL))
-        .bg(BG);
+        .border_style(Style::default().fg(teal()))
+        .bg(bg());
 
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
@@ -285,22 +285,22 @@ pub(super) fn draw_env_popup(frame: &mut Frame, app: &App) {
         let is_active = app.env.active_id.is_none();
 
         if selected {
-            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+            frame.render_widget(Paragraph::new("").bg(surface()), row);
         }
 
         let dot = if is_active { "\u{25cf}" } else { "\u{25cb}" };
         let line = Line::from(vec![
             Span::styled(
                 if selected { " > " } else { "   " },
-                Style::default().fg(TEAL),
+                Style::default().fg(teal()),
             ),
-            Span::styled(format!("{dot} "), Style::default().fg(MUTED)),
+            Span::styled(format!("{dot} "), Style::default().fg(muted())),
             Span::styled(
                 "No environment",
                 if selected {
-                    Style::default().fg(FG).italic()
+                    Style::default().fg(fg()).italic()
                 } else {
-                    Style::default().fg(MUTED).italic()
+                    Style::default().fg(muted()).italic()
                 },
             ),
         ]);
@@ -319,7 +319,7 @@ pub(super) fn draw_env_popup(frame: &mut Frame, app: &App) {
         let is_active = app.env.active_id.as_deref() == Some(&env.id);
 
         if selected {
-            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+            frame.render_widget(Paragraph::new("").bg(surface()), row);
         }
 
         let dot = if is_active { "\u{25cf}" } else { "\u{25cb}" };
@@ -329,26 +329,26 @@ pub(super) fn draw_env_popup(frame: &mut Frame, app: &App) {
             env.name.clone()
         };
         let name_style = if app.env.renaming && selected {
-            Style::default().fg(TEAL)
+            Style::default().fg(teal())
         } else if selected {
-            Style::default().fg(FG)
+            Style::default().fg(fg())
         } else if is_active {
-            Style::default().fg(TEAL)
+            Style::default().fg(teal())
         } else {
-            Style::default().fg(MUTED)
+            Style::default().fg(muted())
         };
 
         let line = Line::from(vec![
             Span::styled(
                 if selected { " > " } else { "   " },
-                Style::default().fg(TEAL),
+                Style::default().fg(teal()),
             ),
             Span::styled(
                 format!("{dot} "),
                 if is_active {
-                    Style::default().fg(TEAL)
+                    Style::default().fg(teal())
                 } else {
-                    Style::default().fg(MUTED)
+                    Style::default().fg(muted())
                 },
             ),
             Span::styled(name, name_style),
@@ -377,10 +377,10 @@ pub(super) fn draw_assertions_popup(frame: &mut Frame, app: &App) {
 
     let block = Block::default()
         .title(title)
-        .title_style(Style::default().fg(TEAL).bold())
+        .title_style(Style::default().fg(teal()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(TEAL))
-        .bg(BG);
+        .border_style(Style::default().fg(teal()))
+        .bg(bg());
 
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
@@ -397,36 +397,36 @@ fn draw_assertion_editor(frame: &mut Frame, app: &App, inner: Rect) {
         Line::default(),
         Line::from(Span::styled(
             "  Examples:",
-            Style::default().fg(MUTED).italic(),
+            Style::default().fg(muted()).italic(),
         )),
         Line::from(Span::styled(
             "    status == 200",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )),
         Line::from(Span::styled(
             "    body contains \"hello\"",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )),
         Line::from(Span::styled(
             "    header Content-Type contains json",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )),
         Line::from(Span::styled(
             "    json $.token != \"\"",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )),
         Line::default(),
         Line::from(vec![
-            Span::styled("  > ", Style::default().fg(GREEN)),
+            Span::styled("  > ", Style::default().fg(green())),
             Span::styled(
                 format!("{}\u{2588}", &app.assertions.edit_buffer),
-                Style::default().fg(FG),
+                Style::default().fg(fg()),
             ),
         ]),
         Line::default(),
         Line::from(Span::styled(
             "  Enter:save  Esc:cancel",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )),
     ];
     frame.render_widget(Paragraph::new(Text::from(lines)), inner);
@@ -438,7 +438,7 @@ fn draw_assertions_list(frame: &mut Frame, app: &App, inner: Rect) {
         frame.render_widget(
             Paragraph::new(Line::from(Span::styled(
                 "  No assertions. Press a to add one.",
-                Style::default().fg(MUTED).italic(),
+                Style::default().fg(muted()).italic(),
             ))),
             Rect::new(inner.x, y_pos, inner.width, 1),
         );
@@ -450,23 +450,23 @@ fn draw_assertions_list(frame: &mut Frame, app: &App, inner: Rect) {
             let row = Rect::new(inner.x, y_pos, inner.width, 1);
             let selected = i == app.assertions.selected;
             if selected {
-                frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+                frame.render_widget(Paragraph::new("").bg(surface()), row);
             }
             let result = app.assertions.results.get(i);
             let (icon, icon_color, detail) = match result {
-                Some(r) if r.passed => ("\u{2713}", GREEN, r.message.clone()),
-                Some(r) => ("\u{2717}", RED, r.message.clone()),
-                None => ("\u{25cb}", MUTED, "(not yet evaluated)".to_owned()),
+                Some(r) if r.passed => ("\u{2713}", green(), r.message.clone()),
+                Some(r) => ("\u{2717}", red(), r.message.clone()),
+                None => ("\u{25cb}", muted(), "(not yet evaluated)".to_owned()),
             };
             let line = Line::from(vec![
                 Span::styled(
                     if selected { " > " } else { "   " },
-                    Style::default().fg(GREEN),
+                    Style::default().fg(green()),
                 ),
                 Span::styled(format!("{icon} "), Style::default().fg(icon_color).bold()),
-                Span::styled(expr, Style::default().fg(FG)),
+                Span::styled(expr, Style::default().fg(fg())),
                 Span::styled("   ", Style::default()),
-                Span::styled(detail, Style::default().fg(MUTED).italic()),
+                Span::styled(detail, Style::default().fg(muted()).italic()),
             ]);
             frame.render_widget(Paragraph::new(line), row);
             y_pos += 1;
@@ -477,7 +477,7 @@ fn draw_assertions_list(frame: &mut Frame, app: &App, inner: Rect) {
     frame.render_widget(
         Paragraph::new(Line::from(Span::styled(
             "  j/k:nav  a:add  e:edit  d:delete  Esc:close",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         ))),
         footer,
     );
@@ -499,10 +499,10 @@ pub(super) fn draw_extractors_popup(frame: &mut Frame, app: &App) {
     );
     let block = Block::default()
         .title(title)
-        .title_style(Style::default().fg(TEAL).bold())
+        .title_style(Style::default().fg(teal()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(TEAL))
-        .bg(BG);
+        .border_style(Style::default().fg(teal()))
+        .bg(bg());
 
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
@@ -519,7 +519,7 @@ fn draw_extractor_editor(frame: &mut Frame, app: &App, inner: Rect) {
         Line::default(),
         Line::from(Span::styled(
             "  Variable name (used as {{name}}):",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )),
         Line::from(vec![
             Span::raw("  "),
@@ -530,16 +530,16 @@ fn draw_extractor_editor(frame: &mut Frame, app: &App, inner: Rect) {
                     app.extractors.editor.edit_key_buf.clone()
                 },
                 Style::default().fg(if app.extractors.editor.edit_field == 0 {
-                    GREEN
+                    green()
                 } else {
-                    FG
+                    fg()
                 }),
             ),
         ]),
         Line::default(),
         Line::from(Span::styled(
             "  JSONPath (e.g. $.token, data.users[0].id):",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )),
         Line::from(vec![
             Span::raw("  "),
@@ -550,16 +550,16 @@ fn draw_extractor_editor(frame: &mut Frame, app: &App, inner: Rect) {
                     app.extractors.editor.edit_value_buf.clone()
                 },
                 Style::default().fg(if app.extractors.editor.edit_field == 1 {
-                    GREEN
+                    green()
                 } else {
-                    FG
+                    fg()
                 }),
             ),
         ]),
         Line::default(),
         Line::from(Span::styled(
             "  Tab:switch  Enter:save  Esc:cancel",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )),
     ];
     frame.render_widget(Paragraph::new(Text::from(lines)), inner);
@@ -571,7 +571,7 @@ fn draw_extractors_list(frame: &mut Frame, app: &App, inner: Rect) {
         frame.render_widget(
             Paragraph::new(Line::from(Span::styled(
                 "  No extractors. Press a to add one.",
-                Style::default().fg(MUTED).italic(),
+                Style::default().fg(muted()).italic(),
             ))),
             Rect::new(inner.x, y_pos, inner.width, 1),
         );
@@ -583,7 +583,7 @@ fn draw_extractors_list(frame: &mut Frame, app: &App, inner: Rect) {
             let row = Rect::new(inner.x, y_pos, inner.width, 1);
             let selected = i == app.extractors.editor.selected;
             if selected {
-                frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+                frame.render_widget(Paragraph::new("").bg(surface()), row);
             }
             let preview = app
                 .extractors
@@ -594,13 +594,13 @@ fn draw_extractors_list(frame: &mut Frame, app: &App, inner: Rect) {
             let line = Line::from(vec![
                 Span::styled(
                     if selected { " > " } else { "   " },
-                    Style::default().fg(GREEN),
+                    Style::default().fg(green()),
                 ),
-                Span::styled(name, Style::default().fg(ORANGE).bold()),
-                Span::styled("  <- ", Style::default().fg(MUTED)),
-                Span::styled(path, Style::default().fg(TEAL)),
-                Span::styled("   = ", Style::default().fg(MUTED)),
-                Span::styled(preview, Style::default().fg(FG)),
+                Span::styled(name, Style::default().fg(orange()).bold()),
+                Span::styled("  <- ", Style::default().fg(muted())),
+                Span::styled(path, Style::default().fg(teal())),
+                Span::styled("   = ", Style::default().fg(muted())),
+                Span::styled(preview, Style::default().fg(fg())),
             ]);
             frame.render_widget(Paragraph::new(line), row);
             y_pos += 1;
@@ -611,7 +611,7 @@ fn draw_extractors_list(frame: &mut Frame, app: &App, inner: Rect) {
     frame.render_widget(
         Paragraph::new(Line::from(Span::styled(
             "  j/k:nav  a:add  e:edit  d:delete  Esc:close",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         ))),
         footer,
     );
@@ -630,10 +630,10 @@ pub(super) fn draw_cookies_popup(frame: &mut Frame, app: &App) {
     let title = format!(" Cookies ({}) ", app.cookies.store.cookies.len());
     let block = Block::default()
         .title(title)
-        .title_style(Style::default().fg(TEAL).bold())
+        .title_style(Style::default().fg(teal()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(TEAL))
-        .bg(BG);
+        .border_style(Style::default().fg(teal()))
+        .bg(bg());
 
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
@@ -642,7 +642,7 @@ pub(super) fn draw_cookies_popup(frame: &mut Frame, app: &App) {
         frame.render_widget(
             Paragraph::new(Line::from(Span::styled(
                 "  No cookies stored. They will be captured automatically from Set-Cookie headers.",
-                Style::default().fg(MUTED).italic(),
+                Style::default().fg(muted()).italic(),
             ))),
             inner,
         );
@@ -669,7 +669,7 @@ pub(super) fn draw_cookies_popup(frame: &mut Frame, app: &App) {
         let row = Rect::new(inner.x, y_pos, inner.width, 1);
         let selected = i == app.cookies.popup_selected;
         if selected {
-            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+            frame.render_widget(Paragraph::new("").bg(surface()), row);
         }
         let marker = if selected { " > " } else { "   " };
         let flags = {
@@ -683,14 +683,14 @@ pub(super) fn draw_cookies_popup(frame: &mut Frame, app: &App) {
             f
         };
         let line = Line::from(vec![
-            Span::styled(marker, Style::default().fg(GREEN)),
-            Span::styled(&cookie.domain, Style::default().fg(TEAL).bold()),
-            Span::styled(&cookie.path, Style::default().fg(MUTED)),
+            Span::styled(marker, Style::default().fg(green())),
+            Span::styled(&cookie.domain, Style::default().fg(teal()).bold()),
+            Span::styled(&cookie.path, Style::default().fg(muted())),
             Span::raw("  "),
-            Span::styled(&cookie.name, Style::default().fg(ORANGE).bold()),
-            Span::styled("=", Style::default().fg(MUTED)),
-            Span::styled(&cookie.value, Style::default().fg(FG)),
-            Span::styled(flags, Style::default().fg(MUTED).italic()),
+            Span::styled(&cookie.name, Style::default().fg(orange()).bold()),
+            Span::styled("=", Style::default().fg(muted())),
+            Span::styled(&cookie.value, Style::default().fg(fg())),
+            Span::styled(flags, Style::default().fg(muted()).italic()),
         ]);
         frame.render_widget(Paragraph::new(line), row);
         y_pos += 1;
@@ -707,7 +707,7 @@ pub(super) fn draw_cookies_popup(frame: &mut Frame, app: &App) {
                 app.cookies.popup_selected + 1,
                 total,
             ),
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         ))),
         footer,
     );
@@ -725,10 +725,10 @@ pub(super) fn draw_tls_popup(frame: &mut Frame, app: &App) {
 
     let block = Block::default()
         .title(" TLS / Certificates ")
-        .title_style(Style::default().fg(TEAL).bold())
+        .title_style(Style::default().fg(teal()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(TEAL))
-        .bg(BG);
+        .border_style(Style::default().fg(teal()))
+        .bg(bg());
 
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
@@ -761,13 +761,13 @@ pub(super) fn draw_tls_popup(frame: &mut Frame, app: &App) {
         let selected = i == app.tls.popup_selected;
         let marker = if selected { " > " } else { "   " };
         let value_style = if selected {
-            Style::default().fg(FG)
+            Style::default().fg(fg())
         } else {
-            Style::default().fg(MUTED)
+            Style::default().fg(muted())
         };
         lines.push(Line::from(vec![
-            Span::styled(marker, Style::default().fg(GREEN)),
-            Span::styled(format!("{label:<18}"), Style::default().fg(TEAL).bold()),
+            Span::styled(marker, Style::default().fg(green())),
+            Span::styled(format!("{label:<18}"), Style::default().fg(teal()).bold()),
             Span::styled(value.clone(), value_style),
         ]));
     }
@@ -775,21 +775,21 @@ pub(super) fn draw_tls_popup(frame: &mut Frame, app: &App) {
     lines.push(Line::default());
     if app.tls.editing {
         lines.push(Line::from(vec![
-            Span::styled("   path: ", Style::default().fg(MUTED)),
+            Span::styled("   path: ", Style::default().fg(muted())),
             Span::styled(
                 format!("{}\u{2588}", &app.tls.edit_buffer),
-                Style::default().fg(GREEN),
+                Style::default().fg(green()),
             ),
         ]));
         lines.push(Line::default());
         lines.push(Line::from(Span::styled(
             "   Enter:save  Esc:cancel",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )));
     } else {
         lines.push(Line::from(Span::styled(
             "   j/k:nav  Enter/Space:toggle/edit  d:clear  Esc:close",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )));
     }
 
@@ -820,27 +820,27 @@ pub(super) fn draw_timeout_popup(frame: &mut Frame, app: &App) {
     } else {
         " Request timeout "
     };
-    let color = if app.timeout.error { RED } else { TEAL };
+    let color = if app.timeout.error { red() } else { teal() };
 
     let block = Block::default()
         .title(title)
         .title_style(Style::default().fg(color).bold())
         .borders(Borders::ALL)
         .border_style(Style::default().fg(color))
-        .bg(BG);
+        .bg(bg());
 
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
     let display = format!("{}\u{2588}", &app.timeout.buffer);
     let lines = vec![
-        Line::from(Span::styled("Seconds:", Style::default().fg(MUTED))),
+        Line::from(Span::styled("Seconds:", Style::default().fg(muted()))),
         Line::default(),
-        Line::from(Span::styled(display, Style::default().fg(FG))),
+        Line::from(Span::styled(display, Style::default().fg(fg()))),
         Line::default(),
         Line::from(Span::styled(
             "Enter:save  Esc:cancel",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )),
     ];
     let paragraph = Paragraph::new(Text::from(lines));
@@ -863,9 +863,9 @@ pub(super) fn draw_env_import_popup(frame: &mut Frame, app: &App) {
         " Import .env "
     };
     let title_style = if app.env.import.error {
-        Style::default().fg(RED).bold()
+        Style::default().fg(red()).bold()
     } else {
-        Style::default().fg(TEAL).bold()
+        Style::default().fg(teal()).bold()
     };
 
     let block = Block::default()
@@ -873,11 +873,11 @@ pub(super) fn draw_env_import_popup(frame: &mut Frame, app: &App) {
         .title_style(title_style)
         .borders(Borders::ALL)
         .border_style(if app.env.import.error {
-            Style::default().fg(RED)
+            Style::default().fg(red())
         } else {
-            Style::default().fg(TEAL)
+            Style::default().fg(teal())
         })
-        .bg(BG);
+        .bg(bg());
 
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
@@ -886,10 +886,10 @@ pub(super) fn draw_env_import_popup(frame: &mut Frame, app: &App) {
     let lines = vec![
         Line::from(Span::styled(
             "Path to .env file:",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )),
         Line::default(),
-        Line::from(Span::styled(display, Style::default().fg(FG))),
+        Line::from(Span::styled(display, Style::default().fg(fg()))),
     ];
     let paragraph = Paragraph::new(Text::from(lines));
     frame.render_widget(paragraph, inner);
@@ -916,10 +916,10 @@ pub(super) fn draw_env_editor(frame: &mut Frame, app: &App) {
     let title = format!(" {env_name} - Variables ");
     let block = Block::default()
         .title(title)
-        .title_style(Style::default().fg(TEAL).bold())
+        .title_style(Style::default().fg(teal()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(TEAL))
-        .bg(BG);
+        .border_style(Style::default().fg(teal()))
+        .bg(bg());
 
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
@@ -938,7 +938,7 @@ pub(super) fn draw_env_editor(frame: &mut Frame, app: &App) {
         let selected = i == app.env.editor.selected;
 
         if selected {
-            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+            frame.render_widget(Paragraph::new("").bg(surface()), row);
         }
 
         let display_value: String = if var.secret {
@@ -951,17 +951,17 @@ pub(super) fn draw_env_editor(frame: &mut Frame, app: &App) {
         let line = Line::from(vec![
             Span::styled(
                 if selected { " > " } else { "   " },
-                Style::default().fg(TEAL),
+                Style::default().fg(teal()),
             ),
-            Span::styled(&var.key, Style::default().fg(TEAL).bold()),
-            Span::styled(secret_indicator, Style::default().fg(YELLOW)),
-            Span::styled(" = ", Style::default().fg(MUTED)),
+            Span::styled(&var.key, Style::default().fg(teal()).bold()),
+            Span::styled(secret_indicator, Style::default().fg(yellow())),
+            Span::styled(" = ", Style::default().fg(muted())),
             Span::styled(
                 display_value,
                 if selected {
-                    Style::default().fg(FG)
+                    Style::default().fg(fg())
                 } else {
-                    Style::default().fg(MUTED)
+                    Style::default().fg(muted())
                 },
             ),
         ]);
@@ -974,15 +974,15 @@ pub(super) fn draw_env_editor(frame: &mut Frame, app: &App) {
         let selected = app.env.editor.selected >= vars.len();
 
         if selected {
-            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+            frame.render_widget(Paragraph::new("").bg(surface()), row);
         }
 
         let line = Line::from(Span::styled(
             "   + add variable",
             if selected {
-                Style::default().fg(TEAL)
+                Style::default().fg(teal())
             } else {
-                Style::default().fg(MUTED)
+                Style::default().fg(muted())
             },
         ));
         frame.render_widget(Paragraph::new(line), row);
@@ -1000,23 +1000,23 @@ fn draw_env_var_edit(frame: &mut Frame, app: &App, parent: Rect) {
 
     let edit_block = Block::default()
         .title(" Edit Variable ")
-        .title_style(Style::default().fg(GREEN).bold())
+        .title_style(Style::default().fg(green()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(GREEN))
-        .bg(BG);
+        .border_style(Style::default().fg(green()))
+        .bg(bg());
 
     let edit_inner = edit_block.inner(edit_area);
     frame.render_widget(edit_block, edit_area);
 
     let key_style = if app.env.editor.var_field == 0 {
-        Style::default().fg(GREEN)
+        Style::default().fg(green())
     } else {
-        Style::default().fg(FG)
+        Style::default().fg(fg())
     };
     let val_style = if app.env.editor.var_field == 1 {
-        Style::default().fg(GREEN)
+        Style::default().fg(green())
     } else {
-        Style::default().fg(FG)
+        Style::default().fg(fg())
     };
 
     let key_display = if app.env.editor.var_field == 0 {
@@ -1032,18 +1032,18 @@ fn draw_env_var_edit(frame: &mut Frame, app: &App, parent: Rect) {
 
     let lines = vec![
         Line::from(vec![
-            Span::styled("  Key:   ", Style::default().fg(MUTED)),
+            Span::styled("  Key:   ", Style::default().fg(muted())),
             Span::styled(key_display, key_style),
         ]),
         Line::default(),
         Line::from(vec![
-            Span::styled("  Value: ", Style::default().fg(MUTED)),
+            Span::styled("  Value: ", Style::default().fg(muted())),
             Span::styled(val_display, val_style),
         ]),
         Line::default(),
         Line::from(Span::styled(
             "  Tab:switch  Enter:save  Esc:cancel",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )),
     ];
     let paragraph = Paragraph::new(Text::from(lines));
@@ -1062,23 +1062,23 @@ pub(super) fn draw_proto_popup(frame: &mut Frame, app: &App) {
 
     let block = Block::default()
         .title(" Load .proto ")
-        .title_style(Style::default().fg(GREEN).bold())
+        .title_style(Style::default().fg(green()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(GREEN))
-        .bg(BG);
+        .border_style(Style::default().fg(green()))
+        .bg(bg());
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
     let mut lines = vec![
         Line::from(Span::styled(
             "  Path to .proto file:",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )),
         Line::from(vec![
             Span::raw("  "),
             Span::styled(
                 format!("{}\u{2588}", app.grpc.proto_buffer),
-                Style::default().fg(FG),
+                Style::default().fg(fg()),
             ),
         ]),
         Line::default(),
@@ -1086,12 +1086,12 @@ pub(super) fn draw_proto_popup(frame: &mut Frame, app: &App) {
     if let Some(err) = &app.grpc.proto_error {
         lines.push(Line::from(Span::styled(
             format!("  ! {err}"),
-            Style::default().fg(RED),
+            Style::default().fg(red()),
         )));
     } else {
         lines.push(Line::from(Span::styled(
             "  Enter:load  Esc:cancel",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )));
     }
 
@@ -1110,23 +1110,23 @@ pub(super) fn draw_plugins_popup(frame: &mut Frame, app: &App) {
 
     let block = Block::default()
         .title(" Plugins ")
-        .title_style(Style::default().fg(GREEN).bold())
+        .title_style(Style::default().fg(green()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(GREEN))
-        .bg(BG);
+        .border_style(Style::default().fg(green()))
+        .bg(bg());
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
     let mut lines = vec![
         Line::from(Span::styled(
             "  comma-separated plugin names from ~/.config/frogbite/plugins/",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )),
         Line::from(vec![
             Span::raw("  "),
             Span::styled(
                 format!("{}\u{2588}", app.plugins.buffer),
-                Style::default().fg(FG),
+                Style::default().fg(fg()),
             ),
         ]),
         Line::default(),
@@ -1134,12 +1134,12 @@ pub(super) fn draw_plugins_popup(frame: &mut Frame, app: &App) {
     if let Some(err) = &app.plugins.error {
         lines.push(Line::from(Span::styled(
             format!("  ! {err}"),
-            Style::default().fg(RED),
+            Style::default().fg(red()),
         )));
     } else {
         lines.push(Line::from(Span::styled(
             "  Enter:save  Esc:cancel",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )));
     }
     frame.render_widget(Paragraph::new(Text::from(lines)), inner);
@@ -1157,23 +1157,23 @@ pub(super) fn draw_proxy_popup(frame: &mut Frame, app: &App) {
 
     let block = Block::default()
         .title(" Proxy URL ")
-        .title_style(Style::default().fg(GREEN).bold())
+        .title_style(Style::default().fg(green()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(GREEN))
-        .bg(BG);
+        .border_style(Style::default().fg(green()))
+        .bg(bg());
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
     let mut lines = vec![
         Line::from(Span::styled(
             "  http://, https://, socks5:// or socks5h:// (empty = no proxy)",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )),
         Line::from(vec![
             Span::raw("  "),
             Span::styled(
                 format!("{}\u{2588}", app.proxy.buffer),
-                Style::default().fg(FG),
+                Style::default().fg(fg()),
             ),
         ]),
         Line::default(),
@@ -1181,12 +1181,12 @@ pub(super) fn draw_proxy_popup(frame: &mut Frame, app: &App) {
     if let Some(err) = &app.proxy.error {
         lines.push(Line::from(Span::styled(
             format!("  ! {err}"),
-            Style::default().fg(RED),
+            Style::default().fg(red()),
         )));
     } else {
         lines.push(Line::from(Span::styled(
             "  Enter:save  Esc:cancel",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )));
     }
     frame.render_widget(Paragraph::new(Text::from(lines)), inner);
@@ -1206,10 +1206,10 @@ pub(super) fn draw_diff_popup(frame: &mut Frame, app: &App) {
 
     let block = Block::default()
         .title(" Diff (snapshot \u{2192} current) ")
-        .title_style(Style::default().fg(GREEN).bold())
+        .title_style(Style::default().fg(green()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(GREEN))
-        .bg(BG);
+        .border_style(Style::default().fg(green()))
+        .bg(bg());
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
@@ -1226,14 +1226,14 @@ pub(super) fn draw_diff_popup(frame: &mut Frame, app: &App) {
     let mut removed = 0usize;
     for change in diff.iter_all_changes() {
         let (sign, color) = match change.tag() {
-            ChangeTag::Equal => (" ", MUTED),
+            ChangeTag::Equal => (" ", muted()),
             ChangeTag::Insert => {
                 added += 1;
-                ("+", GREEN)
+                ("+", green())
             }
             ChangeTag::Delete => {
                 removed += 1;
-                ("-", RED)
+                ("-", red())
             }
         };
         let text = change.value().trim_end_matches('\n').to_owned();
@@ -1246,24 +1246,24 @@ pub(super) fn draw_diff_popup(frame: &mut Frame, app: &App) {
     if lines.is_empty() {
         lines.push(Line::from(Span::styled(
             "(both bodies are empty)",
-            Style::default().fg(MUTED).italic(),
+            Style::default().fg(muted()).italic(),
         )));
     }
 
     let header = Line::from(vec![
         Span::styled(
             format!(" +{added} "),
-            Style::default().fg(BG).bg(GREEN).bold(),
+            Style::default().fg(bg()).bg(green()).bold(),
         ),
         Span::raw(" "),
         Span::styled(
             format!(" -{removed} "),
-            Style::default().fg(BG).bg(RED).bold(),
+            Style::default().fg(bg()).bg(red()).bold(),
         ),
         Span::raw("    "),
         Span::styled(
             "j/k:scroll  s:swap  c:clear snapshot  Esc:close",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         ),
     ]);
 
@@ -1293,10 +1293,10 @@ pub(super) fn draw_gql_vars_popup(frame: &mut Frame, app: &App) {
 
     let block = Block::default()
         .title(" GraphQL variables (JSON) ")
-        .title_style(Style::default().fg(GREEN).bold())
+        .title_style(Style::default().fg(green()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(GREEN))
-        .bg(BG);
+        .border_style(Style::default().fg(green()))
+        .bg(bg());
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
@@ -1318,12 +1318,12 @@ pub(super) fn draw_gql_vars_popup(frame: &mut Frame, app: &App) {
                 let after_start = c + cursor_ch.len_utf8().min(l.len() - c);
                 let after = &l[after_start..];
                 Line::from(vec![
-                    Span::styled(before.to_owned(), Style::default().fg(FG)),
-                    Span::styled(cursor_ch.to_string(), Style::default().fg(BG).bg(GREEN)),
-                    Span::styled(after.to_owned(), Style::default().fg(FG)),
+                    Span::styled(before.to_owned(), Style::default().fg(fg())),
+                    Span::styled(cursor_ch.to_string(), Style::default().fg(bg()).bg(green())),
+                    Span::styled(after.to_owned(), Style::default().fg(fg())),
                 ])
             } else {
-                Line::from(Span::styled((*l).to_owned(), Style::default().fg(FG)))
+                Line::from(Span::styled((*l).to_owned(), Style::default().fg(fg())))
             }
         })
         .collect();
@@ -1331,7 +1331,7 @@ pub(super) fn draw_gql_vars_popup(frame: &mut Frame, app: &App) {
         lines.push(Line::default());
         lines.push(Line::from(Span::styled(
             format!("! {err}"),
-            Style::default().fg(RED),
+            Style::default().fg(red()),
         )));
     }
     frame.render_widget(Paragraph::new(Text::from(lines)), inner);
@@ -1351,10 +1351,10 @@ pub(super) fn draw_gql_schema_popup(frame: &mut Frame, app: &App) {
 
     let block = Block::default()
         .title(" GraphQL schema ")
-        .title_style(Style::default().fg(GREEN).bold())
+        .title_style(Style::default().fg(green()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(GREEN))
-        .bg(BG);
+        .border_style(Style::default().fg(green()))
+        .bg(bg());
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
@@ -1364,7 +1364,7 @@ pub(super) fn draw_gql_schema_popup(frame: &mut Frame, app: &App) {
             .schema_error
             .as_ref()
             .map_or_else(|| "No operations".to_owned(), Clone::clone);
-        let p = Paragraph::new(Text::styled(msg, Style::default().fg(RED).italic()))
+        let p = Paragraph::new(Text::styled(msg, Style::default().fg(red()).italic()))
             .alignment(Alignment::Center);
         frame.render_widget(p, inner);
         return;
@@ -1378,24 +1378,24 @@ pub(super) fn draw_gql_schema_popup(frame: &mut Frame, app: &App) {
         let selected = i == app.graphql.schema_popup_selected;
         let row = Rect::new(inner.x, row_y, inner.width, 1);
         if selected {
-            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+            frame.render_widget(Paragraph::new("").bg(surface()), row);
         }
         let kind_color = match op.kind.as_str() {
-            "Query" => GREEN,
-            "Mutation" => ORANGE,
-            "Subscription" => PURPLE,
-            _ => MUTED,
+            "Query" => green(),
+            "Mutation" => orange(),
+            "Subscription" => purple(),
+            _ => muted(),
         };
         let line = Line::from(vec![
             Span::styled(
                 if selected { " > " } else { "   " },
-                Style::default().fg(GREEN),
+                Style::default().fg(green()),
             ),
             Span::styled(
                 format!("{:<13}", op.kind),
                 Style::default().fg(kind_color).bold(),
             ),
-            Span::styled(&op.name, Style::default().fg(FG)),
+            Span::styled(&op.name, Style::default().fg(fg())),
         ]);
         frame.render_widget(Paragraph::new(line), row);
     }
@@ -1415,17 +1415,17 @@ pub(super) fn draw_grpc_method_popup(frame: &mut Frame, app: &App) {
 
     let block = Block::default()
         .title(" gRPC method ")
-        .title_style(Style::default().fg(GREEN).bold())
+        .title_style(Style::default().fg(green()).bold())
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(GREEN))
-        .bg(BG);
+        .border_style(Style::default().fg(green()))
+        .bg(bg());
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
     if app.grpc.methods.is_empty() {
         let msg = Paragraph::new(Text::styled(
             "No methods - load a .proto first (P)",
-            Style::default().fg(MUTED).italic(),
+            Style::default().fg(muted()).italic(),
         ))
         .alignment(Alignment::Center);
         frame.render_widget(msg, inner);
@@ -1440,14 +1440,14 @@ pub(super) fn draw_grpc_method_popup(frame: &mut Frame, app: &App) {
         let selected = i == app.grpc.method_popup_selected;
         let row = Rect::new(inner.x, row_y, inner.width, 1);
         if selected {
-            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+            frame.render_widget(Paragraph::new("").bg(surface()), row);
         }
         let line = Line::from(vec![
             Span::styled(
                 if selected { " > " } else { "   " },
-                Style::default().fg(GREEN),
+                Style::default().fg(green()),
             ),
-            Span::styled(name, Style::default().fg(FG)),
+            Span::styled(name, Style::default().fg(fg())),
         ]);
         frame.render_widget(Paragraph::new(line), row);
     }

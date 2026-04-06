@@ -19,17 +19,17 @@ pub(super) fn draw_url_bar(frame: &mut Frame, app: &App, area: Rect) {
         let after = &app.request.url[after_start..];
 
         Line::from(vec![
-            Span::styled(method_str, Style::default().fg(BG).bg(color).bold()),
+            Span::styled(method_str, Style::default().fg(bg()).bg(color).bold()),
             Span::raw(" "),
-            Span::styled(before, Style::default().fg(FG)),
-            Span::styled(cursor_ch.to_string(), Style::default().fg(BG).bg(GREEN)),
-            Span::styled(after, Style::default().fg(FG)),
+            Span::styled(before, Style::default().fg(fg())),
+            Span::styled(cursor_ch.to_string(), Style::default().fg(bg()).bg(green())),
+            Span::styled(after, Style::default().fg(fg())),
         ])
     } else {
         Line::from(vec![
-            Span::styled(method_str, Style::default().fg(BG).bg(color).bold()),
+            Span::styled(method_str, Style::default().fg(bg()).bg(color).bold()),
             Span::raw(" "),
-            Span::styled(&app.request.url, Style::default().fg(FG)),
+            Span::styled(&app.request.url, Style::default().fg(fg())),
         ])
     };
 
@@ -91,14 +91,14 @@ pub(super) fn draw_url_bar(frame: &mut Frame, app: &App, area: Rect) {
     );
     let block = Block::default()
         .title(title)
-        .title_style(Style::default().fg(MUTED))
+        .title_style(Style::default().fg(muted()))
         .borders(Borders::ALL)
         .border_style(if is_focused {
-            Style::default().fg(GREEN)
+            Style::default().fg(green())
         } else {
-            Style::default().fg(MUTED)
+            Style::default().fg(muted())
         })
-        .bg(BG);
+        .bg(bg());
 
     let paragraph = Paragraph::new(line).block(block);
     frame.render_widget(paragraph, area);
@@ -155,21 +155,21 @@ fn draw_request_tab_bar(frame: &mut Frame, app: &App, area: Rect) {
         spans.push(Span::styled(
             format!(" {label} "),
             if is_active {
-                Style::default().fg(GREEN).bold().underlined()
+                Style::default().fg(green()).bold().underlined()
             } else {
-                Style::default().fg(MUTED)
+                Style::default().fg(muted())
             },
         ));
     }
 
     let border_color = if is_focused {
-        Style::default().fg(GREEN)
+        Style::default().fg(green())
     } else {
-        Style::default().fg(MUTED)
+        Style::default().fg(muted())
     };
 
     frame.render_widget(
-        Paragraph::new(Line::from(spans)).bg(SURFACE).block(
+        Paragraph::new(Line::from(spans)).bg(surface()).block(
             Block::default()
                 .borders(Borders::LEFT | Borders::RIGHT | Borders::TOP)
                 .border_style(border_color),
@@ -190,21 +190,21 @@ fn draw_body_content(frame: &mut Frame, app: &App, area: Rect) {
             .split(area);
 
         let type_bar = Line::from(vec![
-            Span::styled("  Type: ", Style::default().fg(MUTED)),
+            Span::styled("  Type: ", Style::default().fg(muted())),
             Span::styled(
                 app.request.body_type.label(),
-                Style::default().fg(ORANGE).bold(),
+                Style::default().fg(orange()).bold(),
             ),
-            Span::styled("  (b to change)", Style::default().fg(MUTED)),
+            Span::styled("  (b to change)", Style::default().fg(muted())),
         ]);
         frame.render_widget(
-            Paragraph::new(type_bar).bg(BG).block(
+            Paragraph::new(type_bar).bg(bg()).block(
                 Block::default()
                     .borders(Borders::LEFT | Borders::RIGHT)
                     .border_style(if is_focused {
-                        Style::default().fg(GREEN)
+                        Style::default().fg(green())
                     } else {
-                        Style::default().fg(MUTED)
+                        Style::default().fg(muted())
                     }),
             ),
             layout[0],
@@ -228,27 +228,27 @@ fn draw_body_content(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
         .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
         .border_style(if is_focused {
-            Style::default().fg(GREEN)
+            Style::default().fg(green())
         } else {
-            Style::default().fg(MUTED)
+            Style::default().fg(muted())
         })
-        .bg(BG);
+        .bg(bg());
 
     let mut header_lines = vec![Line::from(vec![
-        Span::styled("  Type: ", Style::default().fg(MUTED)),
-        Span::styled("Raw", Style::default().fg(ORANGE).bold()),
-        Span::styled(" / ", Style::default().fg(MUTED)),
+        Span::styled("  Type: ", Style::default().fg(muted())),
+        Span::styled("Raw", Style::default().fg(orange()).bold()),
+        Span::styled(" / ", Style::default().fg(muted())),
         Span::styled(
             app.request.content_type.label(),
-            Style::default().fg(TEAL).bold(),
+            Style::default().fg(teal()).bold(),
         ),
-        Span::styled("  (b:type  c:format)", Style::default().fg(MUTED)),
+        Span::styled("  (b:type  c:format)", Style::default().fg(muted())),
     ])];
 
     if app.request.body.is_empty() && !app.request.editing_body {
         header_lines.push(Line::from(Span::styled(
             "(empty body)",
-            Style::default().fg(MUTED).italic(),
+            Style::default().fg(muted()).italic(),
         )));
     } else {
         let body_str = if app.request.body.is_empty() {
@@ -257,7 +257,7 @@ fn draw_body_content(frame: &mut Frame, app: &App, area: Rect) {
             &app.request.body
         };
         for (i, line) in body_str.split('\n').enumerate() {
-            let num = Span::styled(format!("{:>3} ", i + 1), Style::default().fg(MUTED));
+            let num = Span::styled(format!("{:>3} ", i + 1), Style::default().fg(muted()));
 
             if app.request.editing_body && i == app.request.body_row {
                 let col = app.request.body_col.min(line.len());
@@ -268,14 +268,14 @@ fn draw_body_content(frame: &mut Frame, app: &App, area: Rect) {
 
                 header_lines.push(Line::from(vec![
                     num,
-                    Span::styled(before, Style::default().fg(FG)),
-                    Span::styled(cursor_ch.to_string(), Style::default().fg(BG).bg(GREEN)),
-                    Span::styled(after, Style::default().fg(FG)),
+                    Span::styled(before, Style::default().fg(fg())),
+                    Span::styled(cursor_ch.to_string(), Style::default().fg(bg()).bg(green())),
+                    Span::styled(after, Style::default().fg(fg())),
                 ]));
             } else {
                 header_lines.push(Line::from(vec![
                     num,
-                    Span::styled(line, Style::default().fg(FG)),
+                    Span::styled(line, Style::default().fg(fg())),
                 ]));
             }
         }
@@ -295,11 +295,11 @@ pub(super) fn draw_kv_content(
     let block = Block::default()
         .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
         .border_style(if is_focused {
-            Style::default().fg(GREEN)
+            Style::default().fg(green())
         } else {
-            Style::default().fg(MUTED)
+            Style::default().fg(muted())
         })
-        .bg(BG);
+        .bg(bg());
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -318,22 +318,22 @@ pub(super) fn draw_kv_content(
         let selected = i == editor.selected;
 
         if selected && is_focused {
-            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+            frame.render_widget(Paragraph::new("").bg(surface()), row);
         }
 
         let line = Line::from(vec![
             Span::styled(
                 if selected && is_focused { " > " } else { "   " },
-                Style::default().fg(GREEN),
+                Style::default().fg(green()),
             ),
-            Span::styled(key, Style::default().fg(TEAL).bold()),
-            Span::styled(": ", Style::default().fg(MUTED)),
+            Span::styled(key, Style::default().fg(teal()).bold()),
+            Span::styled(": ", Style::default().fg(muted())),
             Span::styled(
                 value,
                 if selected && is_focused {
-                    Style::default().fg(FG)
+                    Style::default().fg(fg())
                 } else {
-                    Style::default().fg(MUTED)
+                    Style::default().fg(muted())
                 },
             ),
         ]);
@@ -346,15 +346,15 @@ pub(super) fn draw_kv_content(
         let selected = editor.selected >= editor.entries.len();
 
         if selected && is_focused {
-            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+            frame.render_widget(Paragraph::new("").bg(surface()), row);
         }
 
         let line = Line::from(Span::styled(
             format!("   + add {item_label}"),
             if selected && is_focused {
-                Style::default().fg(GREEN)
+                Style::default().fg(green())
             } else {
-                Style::default().fg(MUTED)
+                Style::default().fg(muted())
             },
         ));
         frame.render_widget(Paragraph::new(line), row);
@@ -363,14 +363,14 @@ pub(super) fn draw_kv_content(
 
 fn draw_kv_edit_inline(frame: &mut Frame, editor: &KvEditorState, area: Rect) {
     let key_style = if editor.edit_field == 0 {
-        Style::default().fg(GREEN)
+        Style::default().fg(green())
     } else {
-        Style::default().fg(FG)
+        Style::default().fg(fg())
     };
     let val_style = if editor.edit_field == 1 {
-        Style::default().fg(GREEN)
+        Style::default().fg(green())
     } else {
-        Style::default().fg(FG)
+        Style::default().fg(fg())
     };
 
     let key_display = if editor.edit_field == 0 {
@@ -387,18 +387,18 @@ fn draw_kv_edit_inline(frame: &mut Frame, editor: &KvEditorState, area: Rect) {
     let lines = vec![
         Line::default(),
         Line::from(vec![
-            Span::styled("  Key:   ", Style::default().fg(MUTED)),
+            Span::styled("  Key:   ", Style::default().fg(muted())),
             Span::styled(key_display, key_style),
         ]),
         Line::default(),
         Line::from(vec![
-            Span::styled("  Value: ", Style::default().fg(MUTED)),
+            Span::styled("  Value: ", Style::default().fg(muted())),
             Span::styled(val_display, val_style),
         ]),
         Line::default(),
         Line::from(Span::styled(
             "  Tab:switch  Enter:save  Esc:cancel",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )),
     ];
     let paragraph = Paragraph::new(Text::from(lines));
@@ -411,11 +411,11 @@ pub(super) fn draw_auth_content(frame: &mut Frame, app: &App, area: Rect) {
     let block = Block::default()
         .borders(Borders::LEFT | Borders::RIGHT | Borders::BOTTOM)
         .border_style(if is_focused {
-            Style::default().fg(GREEN)
+            Style::default().fg(green())
         } else {
-            Style::default().fg(MUTED)
+            Style::default().fg(muted())
         })
-        .bg(BG);
+        .bg(bg());
 
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -434,9 +434,9 @@ pub(super) fn draw_auth_content(frame: &mut Frame, app: &App, area: Rect) {
     let mut lines = vec![
         Line::default(),
         Line::from(vec![
-            Span::styled("  Type: ", Style::default().fg(MUTED)),
-            Span::styled(type_label, Style::default().fg(ORANGE).bold()),
-            Span::styled("  (t to change)", Style::default().fg(MUTED)),
+            Span::styled("  Type: ", Style::default().fg(muted())),
+            Span::styled(type_label, Style::default().fg(orange()).bold()),
+            Span::styled("  (t to change)", Style::default().fg(muted())),
         ]),
     ];
 
@@ -444,14 +444,14 @@ pub(super) fn draw_auth_content(frame: &mut Frame, app: &App, area: Rect) {
     if app.auth.config == Auth::None {
         lines.push(Line::from(Span::styled(
             "  No authentication configured",
-            Style::default().fg(MUTED).italic(),
+            Style::default().fg(muted()).italic(),
         )));
     } else {
         draw_auth_fields_static(app, &mut lines);
         lines.push(Line::default());
         lines.push(Line::from(Span::styled(
             "  e:edit fields  t:change type",
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )));
     }
 
@@ -473,29 +473,29 @@ fn draw_auth_type_selector(frame: &mut Frame, app: &App, area: Rect) {
         let is_active = i == current;
 
         if selected {
-            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+            frame.render_widget(Paragraph::new("").bg(surface()), row);
         }
 
         let dot = if is_active { "\u{25cf}" } else { "\u{25cb}" };
         let line = Line::from(vec![
             Span::styled(
                 if selected { " > " } else { "   " },
-                Style::default().fg(ORANGE),
+                Style::default().fg(orange()),
             ),
             Span::styled(
                 format!("{dot} "),
                 if is_active {
-                    Style::default().fg(ORANGE)
+                    Style::default().fg(orange())
                 } else {
-                    Style::default().fg(MUTED)
+                    Style::default().fg(muted())
                 },
             ),
             Span::styled(
                 *label,
                 if selected {
-                    Style::default().fg(FG)
+                    Style::default().fg(fg())
                 } else {
-                    Style::default().fg(MUTED)
+                    Style::default().fg(muted())
                 },
             ),
         ]);
@@ -516,9 +516,9 @@ fn draw_auth_fields(frame: &mut Frame, app: &App, area: Rect, editing: bool) {
 
     if editing {
         let style_a = if app.auth.field == 0 {
-            Style::default().fg(GREEN)
+            Style::default().fg(green())
         } else {
-            Style::default().fg(FG)
+            Style::default().fg(fg())
         };
         let buf_a = if app.auth.field == 0 {
             format!("{}\u{2588}", &app.auth.buf_a)
@@ -526,15 +526,15 @@ fn draw_auth_fields(frame: &mut Frame, app: &App, area: Rect, editing: bool) {
             app.auth.buf_a.clone()
         };
         lines.push(Line::from(vec![
-            Span::styled(format!("  {label_a}"), Style::default().fg(MUTED)),
+            Span::styled(format!("  {label_a}"), Style::default().fg(muted())),
             Span::styled(buf_a, style_a),
         ]));
 
         if !label_b.is_empty() {
             let style_b = if app.auth.field == 1 {
-                Style::default().fg(GREEN)
+                Style::default().fg(green())
             } else {
-                Style::default().fg(FG)
+                Style::default().fg(fg())
             };
             let buf_b = if app.auth.field == 1 {
                 format!("{}\u{2588}", &app.auth.buf_b)
@@ -543,7 +543,7 @@ fn draw_auth_fields(frame: &mut Frame, app: &App, area: Rect, editing: bool) {
             };
             lines.push(Line::default());
             lines.push(Line::from(vec![
-                Span::styled(format!("  {label_b}"), Style::default().fg(MUTED)),
+                Span::styled(format!("  {label_b}"), Style::default().fg(muted())),
                 Span::styled(buf_b, style_b),
             ]));
         }
@@ -555,7 +555,7 @@ fn draw_auth_fields(frame: &mut Frame, app: &App, area: Rect, editing: bool) {
             } else {
                 "  Tab:switch  Enter:save  Esc:cancel"
             },
-            Style::default().fg(MUTED),
+            Style::default().fg(muted()),
         )));
     }
 
@@ -567,31 +567,31 @@ fn draw_auth_fields_static<'a>(app: &'a App, lines: &mut Vec<Line<'a>>) {
     match &app.auth.config {
         Auth::Bearer { token } => {
             lines.push(Line::from(vec![
-                Span::styled("  Token:    ", Style::default().fg(MUTED)),
-                Span::styled(token, Style::default().fg(FG)),
+                Span::styled("  Token:    ", Style::default().fg(muted())),
+                Span::styled(token, Style::default().fg(fg())),
             ]));
         }
         Auth::Basic { username, password } => {
             lines.push(Line::from(vec![
-                Span::styled("  Username: ", Style::default().fg(MUTED)),
-                Span::styled(username, Style::default().fg(FG)),
+                Span::styled("  Username: ", Style::default().fg(muted())),
+                Span::styled(username, Style::default().fg(fg())),
             ]));
             lines.push(Line::from(vec![
-                Span::styled("  Password: ", Style::default().fg(MUTED)),
+                Span::styled("  Password: ", Style::default().fg(muted())),
                 Span::styled(
                     "\u{2022}".repeat(password.len().clamp(4, 20)),
-                    Style::default().fg(FG),
+                    Style::default().fg(fg()),
                 ),
             ]));
         }
         Auth::ApiKey { header, value } => {
             lines.push(Line::from(vec![
-                Span::styled("  Header:   ", Style::default().fg(MUTED)),
-                Span::styled(header, Style::default().fg(FG)),
+                Span::styled("  Header:   ", Style::default().fg(muted())),
+                Span::styled(header, Style::default().fg(fg())),
             ]));
             lines.push(Line::from(vec![
-                Span::styled("  Value:    ", Style::default().fg(MUTED)),
-                Span::styled(value, Style::default().fg(FG)),
+                Span::styled("  Value:    ", Style::default().fg(muted())),
+                Span::styled(value, Style::default().fg(fg())),
             ]));
         }
         Auth::None => {}

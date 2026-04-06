@@ -9,10 +9,16 @@ pub struct Settings {
     pub vim_keys: bool,
     #[serde(default = "default_true")]
     pub update_check: bool,
+    #[serde(default = "default_theme")]
+    pub theme: String,
 }
 
 const fn default_true() -> bool {
     true
+}
+
+fn default_theme() -> String {
+    "scooby".to_owned()
 }
 
 impl Default for Settings {
@@ -21,6 +27,7 @@ impl Default for Settings {
             splash_animation: true,
             vim_keys: true,
             update_check: true,
+            theme: default_theme(),
         }
     }
 }

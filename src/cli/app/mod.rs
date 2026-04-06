@@ -16,6 +16,12 @@ pub use diff::DiffState;
 pub use graphql::GraphqlState;
 pub use grpc::GrpcState;
 pub use kv_editor::KvEditorState;
+
+#[derive(Debug, Clone)]
+pub enum SettingDisplay {
+    Toggle(bool),
+    Choice(String),
+}
 pub use ws::{WsDirection, WsState, WsStatus};
 
 use std::collections::HashMap;

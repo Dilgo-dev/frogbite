@@ -15,11 +15,11 @@ pub(super) fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
     };
 
     let title_style = if app.sidebar.confirm_delete {
-        Style::default().fg(RED).bold()
+        Style::default().fg(red()).bold()
     } else if app.env.active_id.is_some() {
-        Style::default().fg(TEAL).bold()
+        Style::default().fg(teal()).bold()
     } else {
-        Style::default().fg(GREEN).bold()
+        Style::default().fg(green()).bold()
     };
 
     let block = Block::default()
@@ -27,11 +27,11 @@ pub(super) fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
         .title_style(title_style)
         .borders(Borders::ALL)
         .border_style(if is_focused {
-            Style::default().fg(GREEN)
+            Style::default().fg(green())
         } else {
-            Style::default().fg(MUTED)
+            Style::default().fg(muted())
         })
-        .bg(BG);
+        .bg(bg());
 
     let sidebar_items = app.sidebar_items();
     let items: Vec<ListItem> = sidebar_items
@@ -50,14 +50,14 @@ pub(super) fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
                         f.name.clone()
                     };
                     let name_style = if editing_name {
-                        Style::default().fg(GREEN)
+                        Style::default().fg(green())
                     } else if selected {
-                        Style::default().fg(FG).bold()
+                        Style::default().fg(fg()).bold()
                     } else {
-                        Style::default().fg(MUTED).bold()
+                        Style::default().fg(muted()).bold()
                     };
                     Line::from(vec![
-                        Span::styled(arrow, Style::default().fg(MUTED)),
+                        Span::styled(arrow, Style::default().fg(muted())),
                         Span::styled(name, name_style),
                     ])
                 }
@@ -72,11 +72,11 @@ pub(super) fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
                         req.name.clone()
                     };
                     let name_style = if editing_name {
-                        Style::default().fg(GREEN)
+                        Style::default().fg(green())
                     } else if selected || is_active {
-                        Style::default().fg(FG)
+                        Style::default().fg(fg())
                     } else {
-                        Style::default().fg(MUTED)
+                        Style::default().fg(muted())
                     };
 
                     let indent = if req.folder_id.is_some() { "  " } else { "" };
@@ -93,15 +93,15 @@ pub(super) fn draw_sidebar(frame: &mut Frame, app: &App, area: Rect) {
                 SidebarItem::NewRequest => Line::from(vec![Span::styled(
                     "  + new request",
                     if selected {
-                        Style::default().fg(GREEN)
+                        Style::default().fg(green())
                     } else {
-                        Style::default().fg(MUTED)
+                        Style::default().fg(muted())
                     },
                 )]),
             };
 
             if selected {
-                ListItem::new(line).bg(SURFACE)
+                ListItem::new(line).bg(surface())
             } else {
                 ListItem::new(line)
             }
