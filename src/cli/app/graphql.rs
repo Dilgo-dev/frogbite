@@ -285,14 +285,14 @@ impl App {
             self.graphql.schema_popup_open = false;
             return;
         };
-        let (template, vars_skeleton) = build_template(&op);
+        let (template, vars_skeleton, operation_name) = build_template(&op);
         self.request.body = template;
         self.request.body_row = 0;
         self.request.body_col = 0;
         if let Some(id) = self.sidebar.active_request_id.clone() {
             if let Some(req) = self.sidebar.requests.iter_mut().find(|r| r.id == id) {
                 req.body.clone_from(&self.request.body);
-                op.name.clone_into(&mut req.gql_operation_name);
+                req.gql_operation_name = operation_name;
                 if !vars_skeleton.is_empty() {
                     req.gql_variables = vars_skeleton;
                 }
@@ -303,8 +303,8 @@ impl App {
     }
 }
 
-/// Builds a query template + variables JSON skeleton for an operation.
-fn build_template(op: &GqlOperation) -> (String, String) {
+/// Builds a query template + variables JSON skeleton + operation name.
+fn build_template(op: &GqlOperation) -> (String, String, String) {
     let kind_kw = op.kind.to_lowercase();
     let op_title = capitalize(&op.name);
 
@@ -347,7 +347,7 @@ fn build_template(op: &GqlOperation) -> (String, String) {
         "{kind_kw} {op_title}{sig} {{\n  {name}{call_args}{selection}\n}}\n",
         name = op.name,
     );
-    (template, vars_json)
+    (template, vars_json, op_title)
 }
 
 fn capitalize(s: &str) -> String {
