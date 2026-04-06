@@ -175,6 +175,9 @@ fn draw_main(frame: &mut Frame, app: &App) {
     if app.ws.upload_popup_open {
         modals::draw_ws_upload_popup(frame, app);
     }
+    if app.ws.replay_popup_open {
+        modals::draw_ws_replay_popup(frame, app);
+    }
 }
 
 #[allow(clippy::too_many_lines)]
@@ -186,8 +189,10 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
         "type message  Enter:send  Esc:cancel"
     } else if app.ws.upload_popup_open {
         "type path  Enter:send  Esc:cancel"
+    } else if app.ws.replay_popup_open {
+        "type path  Enter:replay  Esc:cancel"
     } else if app.ws_active() && app.ui.focus == Focus::Response {
-        "i:type  b:fmt  u:upload  d:disc  R:reconnect  c:clr  x:close  j/k:scroll"
+        "i:type  b:fmt  u:upload  S:save  L:replay  d:disc  c:clr  x:close  j/k:scroll"
     } else if app.response.searching {
         "type search term  Enter:search  Esc:cancel"
     } else if app.auth.editing {

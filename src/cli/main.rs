@@ -218,6 +218,8 @@ fn try_dispatch_modal(app: &mut App, key: &event::KeyEvent) -> bool {
         handle_search_key(app, key.code);
     } else if app.ws.upload_popup_open {
         handle_ws_upload_popup_key(app, key.code);
+    } else if app.ws.replay_popup_open {
+        handle_ws_replay_popup_key(app, key.code);
     } else if app.plugins.popup_open {
         handle_plugins_popup_key(app, key.code);
     } else if app.proxy.popup_open {
@@ -815,6 +817,25 @@ fn handle_ws_upload_popup_key(app: &mut App, key: KeyCode) {
     }
 }
 
+fn handle_ws_replay_popup_key(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Esc => {
+            app.ws.replay_popup_open = false;
+            app.ws.replay_error = None;
+        }
+        KeyCode::Enter => app.ws_confirm_replay(),
+        KeyCode::Backspace => {
+            app.ws.replay_buffer.pop();
+            app.ws.replay_error = None;
+        }
+        KeyCode::Char(c) => {
+            app.ws.replay_buffer.push(c);
+            app.ws.replay_error = None;
+        }
+        _ => {}
+    }
+}
+
 fn handle_plugins_popup_key(app: &mut App, key: KeyCode) {
     match key {
         KeyCode::Esc => {
@@ -1038,6 +1059,8 @@ fn handle_ws_panel_key(app: &mut App, key: KeyCode) -> bool {
                 app.ws.reconnect_attempts = 0;
             }
         }
+        KeyCode::Char('S') => app.ws_save_stream(),
+        KeyCode::Char('L') => app.ws_open_replay_popup(),
         KeyCode::Char('d') => app.ws_disconnect(),
         KeyCode::Char('c') => app.ws_clear_stream(),
         KeyCode::Char('x') => app.ws_reset(),

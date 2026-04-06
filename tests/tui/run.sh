@@ -232,4 +232,61 @@ test_ws_reconnect_setting() {
 }
 run_test "settings / WS auto-reconnect entry visible" test_ws_reconnect_setting
 
+# ----------------------------------------------------------------
+# 13 / ws save stream writes a session JSON and shows info message
+# ----------------------------------------------------------------
+test_ws_save_stream() {
+  local s
+  s=$(frog_start ws_save) || return 1
+  frog_send "$s" Tab
+  frog_send "$s" e
+  frog_send "$s" End
+  for _ in $(seq 1 60); do tmux send-keys -t "$s" BSpace; done
+  sleep 0.4
+  frog_type "$s" "ws://localhost:9999"
+  frog_send "$s" Enter
+  sleep 0.8
+  assert_contains "$s" "WS" || return 1
+  # save the stream (has at least the connecting info message)
+  frog_send "$s" S
+  sleep 0.4
+  assert_contains "$s" "saved to" || return 1
+  # verify the file was created
+  local count
+  count=$(find "$HOME/.config/frogbite/ws_sessions" -name '*.json' 2>/dev/null | wc -l)
+  if [ "$count" -ge 1 ]; then
+    printf '    \033[32mok\033[0m  session file exists (%s files)\n' "$count"
+  else
+    printf '    \033[31mFAIL\033[0m  no session file found in ws_sessions/\n'
+    return 1
+  fi
+  frog_send "$s" x
+  frog_stop "$s"
+}
+run_test "ws / save stream writes session JSON" test_ws_save_stream
+
+# ----------------------------------------------------------------
+# 14 / ws replay popup opens with L and can be cancelled
+# ----------------------------------------------------------------
+test_ws_replay_popup() {
+  local s
+  s=$(frog_start ws_replay) || return 1
+  frog_send "$s" Tab
+  frog_send "$s" e
+  frog_send "$s" End
+  for _ in $(seq 1 60); do tmux send-keys -t "$s" BSpace; done
+  sleep 0.4
+  frog_type "$s" "ws://localhost:9999"
+  frog_send "$s" Enter
+  sleep 0.8
+  assert_contains "$s" "WS" || return 1
+  # L should not open popup when not connected
+  frog_send "$s" L
+  sleep 0.3
+  assert_missing "$s" "WS replay session" || return 1
+  frog_send "$s" x
+  frog_stop "$s"
+}
+run_test "ws / replay popup blocked when disconnected" test_ws_replay_popup
+
 summary

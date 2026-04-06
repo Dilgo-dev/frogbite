@@ -1,7 +1,10 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::time::Instant;
+use std::{fs, io};
 
 use frogbite::core::ws::{self, WsEvent, WsHandle};
+use serde::{Deserialize, Serialize};
 
 use super::App;
 
@@ -57,6 +60,93 @@ fn decode_base64(s: &str) -> Result<Vec<u8>, String> {
         }
     }
     Ok(out)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct SavedMessage {
+    direction: String,
+    text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data_base64: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct WsSession {
+    url: String,
+    messages: Vec<SavedMessage>,
+}
+
+fn sessions_dir() -> PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    let path = PathBuf::from(home)
+        .join(".config")
+        .join("frogbite")
+        .join("ws_sessions");
+    let _ = fs::create_dir_all(&path);
+    path
+}
+
+const fn direction_label(d: WsDirection) -> &'static str {
+    match d {
+        WsDirection::Sent => "sent",
+        WsDirection::Recv => "recv",
+        WsDirection::Info => "info",
+        WsDirection::Error => "error",
+    }
+}
+
+fn save_session(url: &str, messages: &[WsMessage]) -> Result<PathBuf, io::Error> {
+    let saved: Vec<SavedMessage> = messages
+        .iter()
+        .map(|m| {
+            let data_base64 = m.data.as_ref().map(|d| encode_base64_simple(d));
+            SavedMessage {
+                direction: direction_label(m.direction).to_owned(),
+                text: m.text.clone(),
+                data_base64,
+            }
+        })
+        .collect();
+    let session = WsSession {
+        url: url.to_owned(),
+        messages: saved,
+    };
+    let json = serde_json::to_string_pretty(&session).map_err(io::Error::other)?;
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let path = sessions_dir().join(format!("{ts}.json"));
+    fs::write(&path, json)?;
+    Ok(path)
+}
+
+fn load_session(path: &str) -> Result<WsSession, String> {
+    let content = fs::read_to_string(path).map_err(|e| format!("read: {e}"))?;
+    serde_json::from_str(&content).map_err(|e| format!("parse: {e}"))
+}
+
+fn encode_base64_simple(data: &[u8]) -> String {
+    const ALPHA: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
+    for chunk in data.chunks(3) {
+        let b0 = chunk[0];
+        let b1 = chunk.get(1).copied().unwrap_or(0);
+        let b2 = chunk.get(2).copied().unwrap_or(0);
+        out.push(ALPHA[(b0 >> 2) as usize] as char);
+        out.push(ALPHA[(((b0 & 0x03) << 4) | (b1 >> 4)) as usize] as char);
+        if chunk.len() > 1 {
+            out.push(ALPHA[(((b1 & 0x0f) << 2) | (b2 >> 6)) as usize] as char);
+        } else {
+            out.push('=');
+        }
+        if chunk.len() > 2 {
+            out.push(ALPHA[(b2 & 0x3f) as usize] as char);
+        } else {
+            out.push('=');
+        }
+    }
+    out
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -124,6 +214,10 @@ pub struct WsState {
     pub upload_popup_open: bool,
     pub upload_buffer: String,
     pub upload_error: Option<String>,
+    pub replay_popup_open: bool,
+    pub replay_buffer: String,
+    pub replay_error: Option<String>,
+    pub save_result: Option<String>,
     pub reconnect_attempts: u32,
     pub reconnect_at: Option<Instant>,
     last_url: Option<String>,
@@ -283,6 +377,84 @@ impl App {
         }
     }
 
+    pub fn ws_save_stream(&mut self) {
+        if self.ws.messages.is_empty() {
+            self.ws.save_result = Some("nothing to save".to_owned());
+            return;
+        }
+        let url = self.ws.last_url.as_deref().unwrap_or(&self.request.url);
+        match save_session(url, &self.ws.messages) {
+            Ok(path) => {
+                let name = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("session");
+                self.ws.push(WsDirection::Info, format!("saved to {name}"));
+                self.ws.save_result = Some(format!("saved: {name}"));
+            }
+            Err(e) => {
+                self.ws
+                    .push(WsDirection::Error, format!("save failed: {e}"));
+                self.ws.save_result = Some(format!("error: {e}"));
+            }
+        }
+    }
+
+    pub fn ws_open_replay_popup(&mut self) {
+        if !matches!(self.ws.status, WsStatus::Connected) {
+            return;
+        }
+        self.ws.replay_buffer.clear();
+        self.ws.replay_error = None;
+        self.ws.replay_popup_open = true;
+    }
+
+    pub fn ws_confirm_replay(&mut self) {
+        let path = self.ws.replay_buffer.trim().to_owned();
+        if path.is_empty() {
+            self.ws.replay_error = Some("path is empty".to_owned());
+            return;
+        }
+        let session = match load_session(&path) {
+            Ok(s) => s,
+            Err(e) => {
+                self.ws.replay_error = Some(e);
+                return;
+            }
+        };
+        self.ws.replay_popup_open = false;
+        self.ws.replay_error = None;
+        let Some(tx) = self.ws.handle.as_ref().map(|h| h.cmd_tx.clone()) else {
+            return;
+        };
+        let outgoing: Vec<_> = session
+            .messages
+            .iter()
+            .filter(|m| m.direction == "sent")
+            .map(|m| {
+                m.data_base64
+                    .as_ref()
+                    .and_then(|b64| decode_base64(b64).ok())
+                    .map_or_else(|| Ok(m.text.clone()), Err)
+            })
+            .collect();
+        let count = outgoing.len();
+        for item in outgoing {
+            match item {
+                Err(bytes) => {
+                    let _ = tx.send(ws::WsCommand::SendBinary(bytes.clone()));
+                    self.ws.push_binary(WsDirection::Sent, bytes);
+                }
+                Ok(text) => {
+                    let _ = tx.send(ws::WsCommand::Send(text.clone()));
+                    self.ws.push(WsDirection::Sent, text);
+                }
+            }
+        }
+        self.ws
+            .push(WsDirection::Info, format!("replayed {count} messages"));
+    }
+
     pub fn ws_clear_stream(&mut self) {
         self.ws.messages.clear();
         self.ws.scroll = 0;
@@ -297,6 +469,10 @@ impl App {
         self.ws.scroll = 0;
         self.ws.reconnect_at = None;
         self.ws.reconnect_attempts = 0;
+        self.ws.replay_popup_open = false;
+        self.ws.replay_buffer.clear();
+        self.ws.replay_error = None;
+        self.ws.save_result = None;
     }
 
     pub fn poll_ws(&mut self) {
