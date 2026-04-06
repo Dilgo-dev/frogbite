@@ -1,5 +1,6 @@
 mod auth_env;
 mod clipboard;
+mod diff;
 mod editing;
 mod graphql;
 mod grpc;
@@ -11,6 +12,7 @@ mod url_utils;
 mod vars_search;
 mod ws;
 
+pub use diff::DiffState;
 pub use graphql::GraphqlState;
 pub use grpc::GrpcState;
 pub use kv_editor::KvEditorState;
@@ -347,6 +349,7 @@ pub struct App {
     pub ws: WsState,
     pub grpc: GrpcState,
     pub graphql: GraphqlState,
+    pub diff: DiffState,
     pub ui: SettingsView,
     pub follow_redirects: bool,
     pub update_available: Option<String>,

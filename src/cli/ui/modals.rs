@@ -1098,6 +1098,95 @@ pub(super) fn draw_proto_popup(frame: &mut Frame, app: &App) {
     frame.render_widget(Paragraph::new(Text::from(lines)), inner);
 }
 
+pub(super) fn draw_diff_popup(frame: &mut Frame, app: &App) {
+    use similar::{ChangeTag, TextDiff};
+
+    let area = frame.area();
+    let popup_w = area.width.saturating_sub(4);
+    let popup_h = area.height.saturating_sub(4);
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .title(" Diff (snapshot \u{2192} current) ")
+        .title_style(Style::default().fg(GREEN).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GREEN))
+        .bg(BG);
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    let snapshot = app.diff.snapshot.as_deref().unwrap_or("");
+    let current = match &app.response.last {
+        Some(Ok(r)) => r.body.as_str(),
+        Some(Err(e)) => e.as_str(),
+        None => "",
+    };
+
+    let diff = TextDiff::from_lines(snapshot, current);
+    let mut lines: Vec<Line> = Vec::new();
+    let mut added = 0usize;
+    let mut removed = 0usize;
+    for change in diff.iter_all_changes() {
+        let (sign, color) = match change.tag() {
+            ChangeTag::Equal => (" ", MUTED),
+            ChangeTag::Insert => {
+                added += 1;
+                ("+", GREEN)
+            }
+            ChangeTag::Delete => {
+                removed += 1;
+                ("-", RED)
+            }
+        };
+        let text = change.value().trim_end_matches('\n').to_owned();
+        lines.push(Line::from(vec![
+            Span::styled(format!("{sign} "), Style::default().fg(color).bold()),
+            Span::styled(text, Style::default().fg(color)),
+        ]));
+    }
+
+    if lines.is_empty() {
+        lines.push(Line::from(Span::styled(
+            "(both bodies are empty)",
+            Style::default().fg(MUTED).italic(),
+        )));
+    }
+
+    let header = Line::from(vec![
+        Span::styled(
+            format!(" +{added} "),
+            Style::default().fg(BG).bg(GREEN).bold(),
+        ),
+        Span::raw(" "),
+        Span::styled(
+            format!(" -{removed} "),
+            Style::default().fg(BG).bg(RED).bold(),
+        ),
+        Span::raw("    "),
+        Span::styled(
+            "j/k:scroll  s:swap  c:clear snapshot  Esc:close",
+            Style::default().fg(MUTED),
+        ),
+    ]);
+
+    let header_area = Rect::new(inner.x, inner.y, inner.width, 1);
+    let body_area = Rect::new(
+        inner.x,
+        inner.y + 1,
+        inner.width,
+        inner.height.saturating_sub(1),
+    );
+    frame.render_widget(Paragraph::new(header), header_area);
+    frame.render_widget(
+        Paragraph::new(Text::from(lines)).scroll((app.diff.scroll, 0)),
+        body_area,
+    );
+}
+
 pub(super) fn draw_gql_vars_popup(frame: &mut Frame, app: &App) {
     let area = frame.area();
     let popup_w = area.width.saturating_sub(10).min(80);

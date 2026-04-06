@@ -130,6 +130,9 @@ fn draw_main(frame: &mut Frame, app: &App) {
     if app.graphql.schema_popup_open {
         modals::draw_gql_schema_popup(frame, app);
     }
+    if app.diff.popup_open {
+        modals::draw_diff_popup(frame, app);
+    }
 }
 
 #[allow(clippy::too_many_lines)]
@@ -190,6 +193,8 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
         "Esc:close"
     } else if app.curl_io.import_open {
         "paste cURL  Ctrl+S:import  Esc:cancel"
+    } else if app.diff.popup_open {
+        "j/k:scroll  s:swap  c:clear  Esc:close"
     } else if app.graphql.vars_popup_open {
         "type JSON  Enter:newline  Ctrl+S:save  Esc:cancel"
     } else if app.graphql.schema_popup_open {
@@ -229,7 +234,9 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
                     }
                     RequestTab::Auth => "1-4:tabs  t:type  e:edit  Enter:send",
                 },
-                Focus::Response => "j/k:scroll  /:search  n/N:match  y:copy  1:body 2:headers",
+                Focus::Response => {
+                    "j/k:scroll  /:search  n/N:match  y:copy  D:diff  1:body 2:headers"
+                }
             },
         }
     };

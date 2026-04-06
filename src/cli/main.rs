@@ -245,6 +245,8 @@ fn try_dispatch_modal(app: &mut App, key: &event::KeyEvent) -> bool {
         handle_gql_vars_popup_key(app, key);
     } else if app.graphql.schema_popup_open {
         handle_gql_schema_popup_key(app, key.code);
+    } else if app.diff.popup_open {
+        handle_diff_popup_key(app, key.code);
     } else {
         return false;
     }
@@ -416,6 +418,21 @@ fn handle_url_edit_key(app: &mut App, key: KeyCode) {
         KeyCode::Home => app.url_cursor_home(),
         KeyCode::End => app.url_cursor_end(),
         KeyCode::Char(c) => app.url_insert(c),
+        _ => {}
+    }
+}
+
+fn handle_diff_popup_key(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Esc | KeyCode::Char('q') => app.diff_close(),
+        KeyCode::Char('j') | KeyCode::Down => {
+            app.diff.scroll = app.diff.scroll.saturating_add(1);
+        }
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.diff.scroll = app.diff.scroll.saturating_sub(1);
+        }
+        KeyCode::Char('s') => app.diff_swap(),
+        KeyCode::Char('c') => app.diff_clear(),
         _ => {}
     }
 }
@@ -1021,6 +1038,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('n') => app.next_match(),
             KeyCode::Char('N') => app.prev_match(),
             KeyCode::Char('y') => app.copy_response_to_clipboard(),
+            KeyCode::Char('D') => app.diff_snapshot_or_open(),
             KeyCode::Esc => app.clear_search(),
             KeyCode::Tab => app.ui.focus = Focus::Sidebar,
             KeyCode::BackTab => app.ui.focus = Focus::Body,

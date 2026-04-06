@@ -50,3 +50,4 @@ protox = "0.7"
 tonic = { version = "0.12", default-features = false, features = ["codegen", "prost", "transport", "tls", "tls-webpki-roots"] }
 bytes = "1"
 http = "1"
+similar = "2"
