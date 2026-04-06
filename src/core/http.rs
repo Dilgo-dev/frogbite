@@ -48,6 +48,8 @@ pub struct HttpResponse {
     pub duration_ms: u128,
     #[serde(default)]
     pub redirect_chain: Vec<String>,
+    #[serde(default)]
+    pub set_cookies: Vec<String>,
 }
 
 /// Sends a blocking HTTP request and returns the parsed response.
@@ -186,8 +188,12 @@ pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
     let status_text = resp.status().to_string();
 
     let mut headers = HashMap::new();
+    let mut set_cookies = Vec::new();
     for (k, v) in resp.headers() {
         if let Ok(val) = v.to_str() {
+            if k.as_str().eq_ignore_ascii_case("set-cookie") {
+                set_cookies.push(val.to_owned());
+            }
             headers.insert(k.to_string(), val.to_owned());
         }
     }
@@ -205,5 +211,6 @@ pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
         body,
         duration_ms,
         redirect_chain,
+        set_cookies,
     })
 }

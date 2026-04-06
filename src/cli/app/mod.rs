@@ -13,10 +13,12 @@ struct PendingRequest {
     rx: Receiver<Result<HttpResponse, String>>,
     method: String,
     url: String,
+    resolved_url: String,
     body: String,
 }
 
 use crate::collections::{self, Auth, BodyType, CollectionData, ContentType, Folder, SavedRequest};
+use crate::cookies::{self, CookieStore};
 use crate::curl;
 use crate::environments::{self, Environment, Variable};
 use crate::history::{self, HistoryEntry};
@@ -193,6 +195,9 @@ pub struct App {
     pub tls_popup_selected: usize,
     pub tls_editing: bool,
     pub tls_edit_buffer: String,
+    pub cookie_store: CookieStore,
+    pub cookies_popup_open: bool,
+    pub cookies_popup_selected: usize,
     pending: Option<PendingRequest>,
 }
 
@@ -302,6 +307,9 @@ impl App {
             tls_popup_selected: 0,
             tls_editing: false,
             tls_edit_buffer: String::new(),
+            cookie_store: cookies::load(),
+            cookies_popup_open: false,
+            cookies_popup_selected: 0,
             pending: None,
         };
 
@@ -1550,6 +1558,43 @@ impl App {
         self.sync_to_collection();
     }
 
+    pub fn open_cookies_popup(&mut self) {
+        self.cookie_store.purge_expired();
+        self.cookies_popup_selected = 0;
+        self.cookies_popup_open = true;
+    }
+
+    pub fn cookies_popup_down(&mut self) {
+        let len = self.cookie_store.cookies.len();
+        if len > 0 && self.cookies_popup_selected + 1 < len {
+            self.cookies_popup_selected += 1;
+        }
+    }
+
+    pub const fn cookies_popup_up(&mut self) {
+        if self.cookies_popup_selected > 0 {
+            self.cookies_popup_selected -= 1;
+        }
+    }
+
+    pub fn cookies_popup_delete(&mut self) {
+        if self.cookie_store.cookies.is_empty() {
+            return;
+        }
+        self.cookie_store.remove(self.cookies_popup_selected);
+        let len = self.cookie_store.cookies.len();
+        if self.cookies_popup_selected >= len && len > 0 {
+            self.cookies_popup_selected = len - 1;
+        }
+        cookies::save(&self.cookie_store);
+    }
+
+    pub fn cookies_popup_clear_all(&mut self) {
+        self.cookie_store.clear();
+        self.cookies_popup_selected = 0;
+        cookies::save(&self.cookie_store);
+    }
+
     pub fn toggle_follow_redirects(&mut self) {
         self.follow_redirects = !self.follow_redirects;
         self.sync_to_collection();
@@ -1572,6 +1617,15 @@ impl App {
             .map(|(k, v)| (k.clone(), self.resolve_variables(v)))
             .collect();
         self.apply_auth_headers(&mut resolved_headers);
+
+        let has_cookie_header = resolved_headers
+            .keys()
+            .any(|k| k.eq_ignore_ascii_case("cookie"));
+        if !has_cookie_header {
+            if let Some(value) = self.cookie_store.header_for(&resolved_url) {
+                resolved_headers.insert("Cookie".to_owned(), value);
+            }
+        }
 
         if !resolved_headers.contains_key("Content-Type")
             && !resolved_headers.contains_key("content-type")
@@ -1626,6 +1680,7 @@ impl App {
             tls_min_version: self.tls_min_version.clone(),
         };
 
+        let resolved_for_pending = opts.url.clone();
         let (tx, rx) = mpsc::channel();
         std::thread::spawn(move || {
             let result = frogbite::core::http::send_request(&opts);
@@ -1636,6 +1691,7 @@ impl App {
             rx,
             method: self.method.as_str().to_owned(),
             url: self.url.clone(),
+            resolved_url: resolved_for_pending,
             body: self.body.clone(),
         });
     }
@@ -1646,6 +1702,14 @@ impl App {
         };
         match pending.rx.try_recv() {
             Ok(result) => {
+                if let Ok(resp) = &result {
+                    if !resp.set_cookies.is_empty() {
+                        self.cookie_store
+                            .ingest(&pending.resolved_url, &resp.set_cookies);
+                        self.cookie_store.purge_expired();
+                        cookies::save(&self.cookie_store);
+                    }
+                }
                 let entry = HistoryEntry {
                     method: pending.method.clone(),
                     url: pending.url.clone(),

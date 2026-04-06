@@ -357,6 +357,100 @@ pub(super) fn draw_env_popup(frame: &mut Frame, app: &App) {
     }
 }
 
+pub(super) fn draw_cookies_popup(frame: &mut Frame, app: &App) {
+    let area = frame.area();
+    let popup_w = area.width.saturating_sub(6).min(100);
+    let popup_h = area.height.saturating_sub(4).min(25);
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let title = format!(" Cookies ({}) ", app.cookie_store.cookies.len());
+    let block = Block::default()
+        .title(title)
+        .title_style(Style::default().fg(TEAL).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(TEAL))
+        .bg(BG);
+
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    if app.cookie_store.cookies.is_empty() {
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                "  No cookies stored. They will be captured automatically from Set-Cookie headers.",
+                Style::default().fg(MUTED).italic(),
+            ))),
+            inner,
+        );
+        return;
+    }
+
+    let visible_rows = inner.height.saturating_sub(2) as usize;
+    let total = app.cookie_store.cookies.len();
+    let start = app
+        .cookies_popup_selected
+        .saturating_sub(visible_rows.saturating_sub(1));
+
+    let mut y_pos = inner.y;
+    for (i, cookie) in app
+        .cookie_store
+        .cookies
+        .iter()
+        .enumerate()
+        .skip(start)
+        .take(visible_rows)
+    {
+        let row = Rect::new(inner.x, y_pos, inner.width, 1);
+        let selected = i == app.cookies_popup_selected;
+        if selected {
+            frame.render_widget(Paragraph::new("").bg(SURFACE), row);
+        }
+        let marker = if selected { " > " } else { "   " };
+        let flags = {
+            let mut f = String::new();
+            if cookie.secure {
+                f.push_str(" secure");
+            }
+            if cookie.http_only {
+                f.push_str(" httponly");
+            }
+            f
+        };
+        let line = Line::from(vec![
+            Span::styled(marker, Style::default().fg(GREEN)),
+            Span::styled(&cookie.domain, Style::default().fg(TEAL).bold()),
+            Span::styled(&cookie.path, Style::default().fg(MUTED)),
+            Span::raw("  "),
+            Span::styled(&cookie.name, Style::default().fg(ORANGE).bold()),
+            Span::styled("=", Style::default().fg(MUTED)),
+            Span::styled(&cookie.value, Style::default().fg(FG)),
+            Span::styled(flags, Style::default().fg(MUTED).italic()),
+        ]);
+        frame.render_widget(Paragraph::new(line), row);
+        y_pos += 1;
+        if y_pos >= inner.y + inner.height - 1 {
+            break;
+        }
+    }
+
+    let footer = Rect::new(inner.x, inner.y + inner.height - 1, inner.width, 1);
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            format!(
+                "  {}/{}  j/k:nav  d:delete  D:clear all  Esc:close",
+                app.cookies_popup_selected + 1,
+                total,
+            ),
+            Style::default().fg(MUTED),
+        ))),
+        footer,
+    );
+}
+
 pub(super) fn draw_tls_popup(frame: &mut Frame, app: &App) {
     let area = frame.area();
     let popup_w = area.width.saturating_sub(8).min(80);

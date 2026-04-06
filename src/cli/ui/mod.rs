@@ -99,6 +99,9 @@ fn draw_main(frame: &mut Frame, app: &App) {
     if app.tls_popup_open {
         modals::draw_tls_popup(frame, app);
     }
+    if app.cookies_popup_open {
+        modals::draw_cookies_popup(frame, app);
+    }
     if app.env_editor_open {
         modals::draw_env_editor(frame, app);
     }
@@ -122,6 +125,8 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
         "j/k:navigate  Enter/a:edit  d:delete  s:secret  Esc:back"
     } else if app.env_renaming {
         "type name  Enter:confirm  Esc:cancel"
+    } else if app.cookies_popup_open {
+        "j/k:nav  d:delete  D:clear all  Esc:close"
     } else if app.tls_popup_open {
         if app.tls_editing {
             "type path  Enter:save  Esc:cancel"
@@ -158,7 +163,7 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
                     "j/k:nav  a:new  A:folder  d:del  D:dup  r:rename  i:curl  I:postman  q:quit"
                 }
                 Focus::UrlBar => {
-                    "e:edit  m:method  A:auth  R:redir  T:timeout  S:tls  Enter:send  h:hist  E:env"
+                    "e:edit  m:method  A:auth  R:redir  T:timeout  S:tls  C:cookies  Enter:send  E:env"
                 }
                 Focus::Body => match app.request_tab {
                     RequestTab::Body => {

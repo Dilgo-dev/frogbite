@@ -1,5 +1,6 @@
 mod app;
 mod collections;
+mod cookies;
 mod curl;
 mod environments;
 mod history;
@@ -199,6 +200,10 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
     }
     if app.tls_popup_open {
         handle_tls_popup_key(app, key.code);
+        return false;
+    }
+    if app.cookies_popup_open {
+        handle_cookies_popup_key(app, key.code);
         return false;
     }
     if app.env_popup_open {
@@ -535,6 +540,17 @@ fn handle_env_var_edit_key(app: &mut App, key: KeyCode) {
     }
 }
 
+fn handle_cookies_popup_key(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Esc | KeyCode::Char('q') => app.cookies_popup_open = false,
+        KeyCode::Char('j') | KeyCode::Down => app.cookies_popup_down(),
+        KeyCode::Char('k') | KeyCode::Up => app.cookies_popup_up(),
+        KeyCode::Char('d') => app.cookies_popup_delete(),
+        KeyCode::Char('D') => app.cookies_popup_clear_all(),
+        _ => {}
+    }
+}
+
 fn handle_tls_popup_key(app: &mut App, key: KeyCode) {
     if app.tls_editing {
         match key {
@@ -746,6 +762,7 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             KeyCode::Char('R') => app.toggle_follow_redirects(),
             KeyCode::Char('T') => app.open_timeout_popup(),
             KeyCode::Char('S') => app.open_tls_popup(),
+            KeyCode::Char('C') => app.open_cookies_popup(),
             KeyCode::Enter => app.send_request(),
             KeyCode::Tab => app.focus = Focus::Body,
             KeyCode::BackTab => app.focus = Focus::Sidebar,
