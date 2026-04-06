@@ -8,6 +8,7 @@ use serde_json::json;
 use crate::assertions;
 use crate::collections::{self, Auth, BodyType, ContentType, SavedRequest};
 use crate::curl::base64;
+use crate::update;
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
@@ -15,6 +16,8 @@ pub enum Command {
     Send(SendArgs),
     /// Run the saved collection as a test suite
     Run(RunArgs),
+    /// Check for and install the latest frogbite release
+    Update,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum, Default)]
@@ -71,6 +74,7 @@ pub fn execute(cmd: &Command) -> ExitCode {
     let result = match cmd {
         Command::Send(args) => run_send(args),
         Command::Run(args) => run_collection(args),
+        Command::Update => run_update(),
     };
     match result {
         Ok(code) => code,
@@ -409,6 +413,21 @@ fn apply_auth(auth: &Auth, headers: &mut HashMap<String, String>) {
             headers.insert(header.clone(), value.clone());
         }
     }
+}
+
+fn run_update() -> Result<ExitCode, String> {
+    let current = env!("CARGO_PKG_VERSION");
+    println!("current version: {current}");
+    let latest = update::fetch_latest_version()?;
+    println!("latest release : {latest}");
+    if !update::is_newer(&latest, current) {
+        println!("already up to date");
+        return Ok(ExitCode::SUCCESS);
+    }
+    println!("installing {latest}...");
+    update::self_install()?;
+    println!("update complete");
+    Ok(ExitCode::SUCCESS)
 }
 
 const fn content_type_mime(ct: ContentType) -> &'static str {

@@ -332,6 +332,8 @@ pub struct App {
     pub assertions: AssertionsState,
     pub ui: SettingsView,
     pub follow_redirects: bool,
+    pub update_available: Option<String>,
+    update_check_rx: Option<Receiver<String>>,
     pending: Option<PendingRequest>,
 }
 
@@ -391,6 +393,26 @@ impl App {
         }
 
         app
+    }
+
+    pub fn set_update_check_rx(&mut self, rx: Receiver<String>) {
+        self.update_check_rx = Some(rx);
+    }
+
+    pub fn poll_update_check(&mut self) {
+        let Some(rx) = self.update_check_rx.as_ref() else {
+            return;
+        };
+        match rx.try_recv() {
+            Ok(version) => {
+                self.update_available = Some(version);
+                self.update_check_rx = None;
+            }
+            Err(mpsc::TryRecvError::Disconnected) => {
+                self.update_check_rx = None;
+            }
+            Err(mpsc::TryRecvError::Empty) => {}
+        }
     }
 }
 

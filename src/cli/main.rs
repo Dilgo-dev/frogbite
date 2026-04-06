@@ -9,6 +9,7 @@ mod postman;
 mod run_cmd;
 mod settings;
 mod ui;
+mod update;
 
 use std::io;
 use std::process::ExitCode;
@@ -47,6 +48,20 @@ fn main() -> ExitCode {
 fn run_tui() -> io::Result<()> {
     let s = settings::load();
 
+    let update_rx = if s.update_check {
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            if let Ok(latest) = update::fetch_latest_version() {
+                if update::is_newer(&latest, env!("CARGO_PKG_VERSION")) {
+                    let _ = tx.send(latest);
+                }
+            }
+        });
+        Some(rx)
+    } else {
+        None
+    };
+
     enable_raw_mode()?;
     io::stdout().execute(EnterAlternateScreen)?;
     let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
@@ -55,7 +70,7 @@ fn run_tui() -> io::Result<()> {
         show_splash(&mut terminal)?;
     }
 
-    let result = run(&mut terminal);
+    let result = run(&mut terminal, update_rx);
 
     disable_raw_mode()?;
     io::stdout().execute(LeaveAlternateScreen)?;
@@ -126,8 +141,14 @@ fn show_splash(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Res
     Ok(())
 }
 
-fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
+fn run(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    update_rx: Option<std::sync::mpsc::Receiver<String>>,
+) -> io::Result<()> {
     let mut app = App::new();
+    if let Some(rx) = update_rx {
+        app.set_update_check_rx(rx);
+    }
 
     loop {
         terminal.draw(|frame| {
@@ -152,6 +173,7 @@ fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> 
         }
 
         app.poll_pending();
+        app.poll_update_check();
     }
 }
 

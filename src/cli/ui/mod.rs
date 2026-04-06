@@ -204,8 +204,13 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
         }
     };
 
-    frame.render_widget(
-        Paragraph::new(Line::from(Span::styled(help, Style::default().fg(MUTED)))).bg(SURFACE),
-        help_area,
-    );
+    let mut spans = vec![Span::styled(help, Style::default().fg(MUTED))];
+    if let Some(v) = &app.update_available {
+        spans.push(Span::raw("  "));
+        spans.push(Span::styled(
+            format!("• update {v} available (frogbite update)"),
+            Style::default().fg(Color::Rgb(255, 111, 0)),
+        ));
+    }
+    frame.render_widget(Paragraph::new(Line::from(spans)).bg(SURFACE), help_area);
 }

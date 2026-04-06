@@ -42,6 +42,10 @@ impl App {
         vec![
             ("Splash animation", self.ui.settings.splash_animation),
             ("Vim keys", self.ui.settings.vim_keys),
+            (
+                "Check for updates on startup",
+                self.ui.settings.update_check,
+            ),
         ]
     }
 
@@ -49,6 +53,7 @@ impl App {
         match self.ui.settings_selected {
             0 => self.ui.settings.splash_animation = !self.ui.settings.splash_animation,
             1 => self.ui.settings.vim_keys = !self.ui.settings.vim_keys,
+            2 => self.ui.settings.update_check = !self.ui.settings.update_check,
             _ => {}
         }
         settings::save(&self.ui.settings);

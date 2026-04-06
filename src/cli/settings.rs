@@ -7,6 +7,12 @@ use std::path::PathBuf;
 pub struct Settings {
     pub splash_animation: bool,
     pub vim_keys: bool,
+    #[serde(default = "default_true")]
+    pub update_check: bool,
+}
+
+const fn default_true() -> bool {
+    true
 }
 
 impl Default for Settings {
@@ -14,6 +20,7 @@ impl Default for Settings {
         Self {
             splash_animation: true,
             vim_keys: true,
+            update_check: true,
         }
     }
 }
