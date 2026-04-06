@@ -237,6 +237,10 @@ pub struct App {
     pub auth_field: usize,
     pub auth_buf_a: String,
     pub auth_buf_b: String,
+    pub response_search: String,
+    pub response_searching: bool,
+    pub response_search_buf: String,
+    pub response_match_idx: usize,
 }
 
 impl App {
@@ -325,6 +329,10 @@ impl App {
             auth_field: 0,
             auth_buf_a: String::new(),
             auth_buf_b: String::new(),
+            response_search: String::new(),
+            response_searching: false,
+            response_search_buf: String::new(),
+            response_match_idx: 0,
         };
 
         if let Some(id) = &app.active_request_id.clone() {
@@ -1369,6 +1377,67 @@ impl App {
             result = result.replace(&pattern, &var.value);
         }
         result
+    }
+
+    // -- Search --
+
+    pub fn open_search(&mut self) {
+        self.response_search_buf = self.response_search.clone();
+        self.response_searching = true;
+    }
+
+    pub fn confirm_search(&mut self) {
+        self.response_search = self.response_search_buf.clone();
+        self.response_searching = false;
+        self.response_match_idx = 0;
+        self.scroll_to_match();
+    }
+
+    pub const fn cancel_search(&mut self) {
+        self.response_searching = false;
+    }
+
+    pub fn clear_search(&mut self) {
+        self.response_search.clear();
+        self.response_searching = false;
+    }
+
+    pub fn next_match(&mut self) {
+        if self.response_search.is_empty() {
+            return;
+        }
+        self.response_match_idx += 1;
+        self.scroll_to_match();
+    }
+
+    pub fn prev_match(&mut self) {
+        if self.response_search.is_empty() {
+            return;
+        }
+        self.response_match_idx = self.response_match_idx.saturating_sub(1);
+        self.scroll_to_match();
+    }
+
+    fn scroll_to_match(&mut self) {
+        let body = self.formatted_response_body();
+        if self.response_search.is_empty() {
+            return;
+        }
+        let needle = self.response_search.to_ascii_lowercase();
+        let mut match_count = 0;
+        for (i, line) in body.lines().enumerate() {
+            if line.to_ascii_lowercase().contains(&needle) {
+                if match_count == self.response_match_idx {
+                    self.response_scroll = i as u16;
+                    return;
+                }
+                match_count += 1;
+            }
+        }
+        if match_count > 0 {
+            self.response_match_idx = 0;
+            self.scroll_to_match();
+        }
     }
 
     fn resolve_form_entries(&self) -> Vec<(String, String)> {

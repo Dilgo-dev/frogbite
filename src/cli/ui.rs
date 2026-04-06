@@ -535,13 +535,61 @@ fn draw_kv_edit_inline(frame: &mut Frame, editor: &crate::app::KvEditorState, ar
 }
 
 fn draw_response(frame: &mut Frame, app: &App, area: Rect) {
+    let has_search = app.response_searching || !app.response_search.is_empty();
+    let constraints = if has_search {
+        vec![
+            Constraint::Length(2),
+            Constraint::Length(1),
+            Constraint::Min(1),
+        ]
+    } else {
+        vec![Constraint::Length(2), Constraint::Min(1)]
+    };
     let layout = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Length(2), Constraint::Min(1)])
+        .constraints(constraints)
         .split(area);
 
     draw_response_status_bar(frame, app, layout[0]);
-    draw_response_content(frame, app, layout[1]);
+
+    if has_search {
+        draw_search_bar(frame, app, layout[1]);
+        draw_response_content(frame, app, layout[2]);
+    } else {
+        draw_response_content(frame, app, layout[1]);
+    }
+}
+
+fn draw_search_bar(frame: &mut Frame, app: &App, area: Rect) {
+    let is_focused = app.focus == Focus::Response;
+    let border_style = if is_focused {
+        Style::default().fg(GREEN)
+    } else {
+        Style::default().fg(MUTED)
+    };
+
+    let display = if app.response_searching {
+        format!(" /{}\u{2588}", &app.response_search_buf)
+    } else {
+        format!(" /{}", &app.response_search)
+    };
+
+    let line = Line::from(vec![
+        Span::styled(
+            display,
+            Style::default().fg(if app.response_searching { GREEN } else { MUTED }),
+        ),
+        Span::styled("  n:next  N:prev  Esc:clear", Style::default().fg(MUTED)),
+    ]);
+
+    frame.render_widget(
+        Paragraph::new(line).bg(SURFACE).block(
+            Block::default()
+                .borders(Borders::LEFT | Borders::RIGHT)
+                .border_style(border_style),
+        ),
+        area,
+    );
 }
 
 fn draw_response_status_bar(frame: &mut Frame, app: &App, area: Rect) {
@@ -624,6 +672,7 @@ fn draw_response_content(frame: &mut Frame, app: &App, area: Rect) {
             let body = app.formatted_response_body();
             let is_json = body.starts_with('{') || body.starts_with('[');
 
+            let search = &app.response_search;
             let lines: Vec<Line> = body
                 .lines()
                 .enumerate()
@@ -632,7 +681,13 @@ fn draw_response_content(frame: &mut Frame, app: &App, area: Rect) {
                         format!("{:>3} ", i + 1),
                         Style::default().fg(MUTED),
                     )];
-                    if is_json {
+                    if !search.is_empty()
+                        && line
+                            .to_ascii_lowercase()
+                            .contains(&search.to_ascii_lowercase())
+                    {
+                        spans.extend(highlight_search_in_line(line, search));
+                    } else if is_json {
                         spans.extend(highlight_json_line(line));
                     } else {
                         spans.push(Span::styled(line, Style::default().fg(FG)));
@@ -670,6 +725,32 @@ fn draw_response_content(frame: &mut Frame, app: &App, area: Rect) {
             frame.render_widget(paragraph, area);
         }
     }
+}
+
+fn highlight_search_in_line<'a>(line: &'a str, needle: &str) -> Vec<Span<'a>> {
+    let lower_line = line.to_ascii_lowercase();
+    let lower_needle = needle.to_ascii_lowercase();
+    let mut spans = Vec::new();
+    let mut pos = 0;
+
+    while let Some(idx) = lower_line[pos..].find(&lower_needle) {
+        let start = pos + idx;
+        let end = start + needle.len();
+        if start > pos {
+            spans.push(Span::styled(&line[pos..start], Style::default().fg(FG)));
+        }
+        spans.push(Span::styled(
+            &line[start..end],
+            Style::default().fg(BG).bg(YELLOW).bold(),
+        ));
+        pos = end;
+    }
+
+    if pos < line.len() {
+        spans.push(Span::styled(&line[pos..], Style::default().fg(FG)));
+    }
+
+    spans
 }
 
 fn highlight_json_line(line: &str) -> Vec<Span<'_>> {
@@ -1592,7 +1673,9 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
     let area = frame.area();
     let help_area = Rect::new(0, area.height.saturating_sub(1), area.width, 1);
 
-    let help = if app.auth_editing {
+    let help = if app.response_searching {
+        "type search term  Enter:search  Esc:cancel"
+    } else if app.auth_editing {
         "type value  Tab:switch  Enter:save  Esc:cancel"
     } else if app.auth_selecting_type {
         "j/k:navigate  Enter:select  Esc:cancel"
@@ -1647,7 +1730,7 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
                     }
                     RequestTab::Auth => "1-4:tabs  t:type  e:edit  Enter:send",
                 },
-                Focus::Response => "j/k:scroll  1:body 2:headers  h:history  E:env",
+                Focus::Response => "j/k:scroll  /:search  n/N:next/prev  1:body 2:headers",
             },
         }
     };

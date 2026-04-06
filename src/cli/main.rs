@@ -131,6 +131,10 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
     if app.view == View::Settings {
         return handle_settings_key(app, key.code);
     }
+    if app.response_searching {
+        handle_search_key(app, key.code);
+        return false;
+    }
     if app.form_editor.editing {
         handle_kv_edit_key(&mut app.form_editor, key.code);
         if !app.form_editor.editing {
@@ -352,6 +356,18 @@ fn handle_body_edit_key(app: &mut App, key: KeyCode) {
         KeyCode::End => app.body_cursor_end(),
         KeyCode::Tab => app.body_insert_tab(),
         KeyCode::Char(c) => app.body_insert(c),
+        _ => {}
+    }
+}
+
+fn handle_search_key(app: &mut App, key: KeyCode) {
+    match key {
+        KeyCode::Esc => app.cancel_search(),
+        KeyCode::Enter => app.confirm_search(),
+        KeyCode::Backspace => {
+            app.response_search_buf.pop();
+        }
+        KeyCode::Char(c) => app.response_search_buf.push(c),
         _ => {}
     }
 }
@@ -694,6 +710,10 @@ fn handle_normal_key(app: &mut App, key: KeyCode) -> bool {
             }
             KeyCode::Char('1') => app.response_tab = ResponseTab::Body,
             KeyCode::Char('2') => app.response_tab = ResponseTab::Headers,
+            KeyCode::Char('/') => app.open_search(),
+            KeyCode::Char('n') => app.next_match(),
+            KeyCode::Char('N') => app.prev_match(),
+            KeyCode::Esc => app.clear_search(),
             KeyCode::Tab => app.focus = Focus::Sidebar,
             KeyCode::BackTab => app.focus = Focus::Body,
             _ => {}
