@@ -182,7 +182,11 @@ fn run_collection(args: &RunArgs) -> Result<ExitCode, String> {
         total_assertions - failed_assertions
     );
 
-    Ok(ExitCode::SUCCESS)
+    if failed_requests > 0 {
+        Ok(ExitCode::from(1))
+    } else {
+        Ok(ExitCode::SUCCESS)
+    }
 }
 
 fn send_saved(req: &SavedRequest) -> Result<HttpResponse, String> {
