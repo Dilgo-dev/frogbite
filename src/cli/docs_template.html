@@ -12,8 +12,8 @@
 :root {
   --bg: #0a100e;
   --bg-deep: #060a09;
+  --paper: #0e1513;
   --surface: #111815;
-  --surface-2: #16201c;
   --line: #1c2a25;
   --line-strong: #2a3d36;
   --fg: #e7ece4;
@@ -21,226 +21,248 @@
   --fg-dim: #4a5852;
   --primary: #8bd14a;
   --primary-deep: #5a9a23;
-  --primary-glow: #8bd14a22;
   --secondary: #ff7a1a;
   --error: #ef4444;
   --warning: #f59e0b;
   --info: #06b6d4;
+  --sidebar-w: 300px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html { background: var(--bg-deep); -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
 body {
-  font-family: "Satoshi", system-ui, sans-serif;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
   color: var(--fg);
   background: var(--bg);
+  font-size: 13px;
+  line-height: 1.65;
   min-height: 100vh;
-  line-height: 1.6;
-  font-size: 15px;
 }
 ::selection { background: var(--primary); color: var(--bg-deep); }
 
-.grid-bg {
-  position: fixed; inset: 0;
-  background-image:
-    linear-gradient(var(--line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--line) 1px, transparent 1px);
-  background-size: 56px 56px;
-  -webkit-mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
-          mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
-  pointer-events: none;
-  opacity: 0.55;
-  z-index: 0;
-}
-.noise {
-  position: fixed; inset: 0; opacity: 0.045;
-  pointer-events: none; z-index: 9999;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  background-size: 220px 220px;
-  mix-blend-mode: overlay;
+/* ─────────────────────────  LAYOUT  ───────────────────────── */
+
+.shell {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  min-height: 100vh;
 }
 
-.container {
-  position: relative;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 56px 32px 120px;
-  z-index: 1;
-}
+/* ─────────────────────────  SIDEBAR  ───────────────────────── */
 
-/* Top bar */
-.topbar {
-  display: flex; align-items: center; justify-content: space-between;
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 20px; margin-bottom: 56px;
+aside.nav {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  overflow-y: auto;
+  border-right: 1px solid var(--line);
+  background: var(--paper);
+  padding: 28px 24px 40px;
 }
-.brand {
-  display: flex; align-items: center; gap: 12px;
-  font-family: "JetBrains Mono", monospace;
-  font-size: 12px; letter-spacing: 0.18em;
+aside.nav::-webkit-scrollbar { width: 6px; }
+aside.nav::-webkit-scrollbar-thumb { background: var(--line-strong); }
+
+.nav-brand {
+  display: flex; align-items: center; gap: 10px;
+  padding-bottom: 20px;
+  border-bottom: 1px dashed var(--line-strong);
+  margin-bottom: 22px;
 }
-.brand-mark {
-  width: 24px; height: 24px; display: grid; place-items: center;
+.nav-brand-mark {
+  width: 18px; height: 18px; display: grid; place-items: center;
   border: 1px solid var(--primary);
 }
-.brand-dot {
-  width: 8px; height: 8px; background: var(--primary);
-  animation: glowPulse 2.4s ease-in-out infinite;
+.nav-brand-dot { width: 6px; height: 6px; background: var(--primary); }
+.nav-brand-name {
+  font-size: 11px; letter-spacing: 0.22em; color: var(--fg);
+  font-weight: 700;
 }
-@keyframes glowPulse { 0%,100% { opacity:.45; transform:scale(1); } 50% { opacity:1; transform:scale(1.25); } }
-.brand-name { color: var(--fg); }
-.topbar-meta {
-  font-family: "JetBrains Mono", monospace; font-size: 10px;
-  letter-spacing: 0.18em; text-transform: uppercase; color: var(--fg-muted);
+.nav-brand-sub {
+  margin-left: auto;
+  font-size: 9px; letter-spacing: 0.18em; color: var(--fg-dim);
 }
 
-/* Hero ASCII */
-.ascii {
+.nav-section-title {
+  font-size: 9px; letter-spacing: 0.22em;
+  color: var(--fg-dim); margin: 24px 0 10px;
+  text-transform: uppercase;
+}
+.nav-section-title::before { content: "§ "; color: var(--primary-deep); }
+
+.nav-folder {
+  font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--fg-muted); margin: 18px 0 6px;
+  padding-left: 4px;
+}
+
+.nav-list { list-style: none; }
+.nav-item {
+  display: grid;
+  grid-template-columns: 38px auto 1fr;
+  align-items: baseline;
+  gap: 8px;
+  padding: 5px 4px;
+  border-left: 1px solid transparent;
+  text-decoration: none;
+  color: var(--fg-muted);
+  transition: color .15s, border-color .15s, background .15s;
+  font-size: 11px;
+}
+.nav-item:hover { color: var(--fg); border-left-color: var(--primary-deep); background: rgba(139,209,74,.04); }
+.nav-num { color: var(--fg-dim); font-size: 10px; letter-spacing: 0.05em; }
+.nav-pill {
+  font-size: 8px; letter-spacing: 0.1em; font-weight: 700;
+  padding: 2px 5px; color: var(--bg-deep);
+  text-align: center; min-width: 36px;
+}
+.nav-name { color: inherit; line-height: 1.35; }
+
+/* ─────────────────────────  CONTENT  ───────────────────────── */
+
+main.content {
+  padding: 56px clamp(28px, 5vw, 72px) 120px;
+  max-width: 980px;
+}
+
+/* HEADER metadata block */
+
+.meta-block {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 32px;
+  border-top: 2px solid var(--primary);
+  border-bottom: 1px solid var(--line-strong);
+  padding: 24px 0 28px;
+  margin-bottom: 56px;
+}
+.meta-doc-id {
+  font-size: 9px; letter-spacing: 0.24em; color: var(--fg-dim);
+  text-transform: uppercase; margin-bottom: 14px;
+}
+.meta-doc-id strong { color: var(--primary); font-weight: 700; }
+.meta-title {
+  font-family: "Cabinet Grotesk", "Satoshi", sans-serif;
+  font-size: clamp(2rem, 4.2vw, 3.4rem);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  line-height: 1;
+  color: var(--fg);
+  margin-bottom: 6px;
+}
+.meta-subtitle {
+  font-size: 11px; color: var(--fg-muted);
+  letter-spacing: 0.04em;
+}
+
+.meta-table {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  color: var(--fg-muted);
+  text-transform: uppercase;
+  align-self: end;
+}
+.meta-table dl {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 4px 14px;
+}
+.meta-table dt { color: var(--fg-dim); }
+.meta-table dd { color: var(--fg); font-weight: 700; }
+.meta-table dd .accent { color: var(--primary); }
+
+.ascii-strip {
   font-family: "JetBrains Mono", monospace;
   font-weight: 700;
   white-space: pre;
   line-height: 1.05;
   color: var(--primary);
-  text-shadow: 0 0 18px var(--primary-glow);
-  font-size: clamp(6px, 1.45vw, 14px);
-  margin-bottom: 36px;
-  overflow-x: auto;
-}
-
-.kicker {
-  display: inline-flex; align-items: center; gap: 10px;
-  font-family: "JetBrains Mono", monospace; font-size: 10px;
-  letter-spacing: 0.2em; text-transform: uppercase;
-  color: var(--fg-muted);
-  margin-bottom: 24px;
-}
-.kicker-dot { width: 6px; height: 6px; background: var(--primary); }
-
-h1.display {
-  font-family: "Cabinet Grotesk", "Satoshi", sans-serif;
-  font-weight: 800;
-  font-size: clamp(2.4rem, 5.5vw, 4.8rem);
-  letter-spacing: -0.04em;
-  line-height: 0.92;
-  color: white;
-  margin-bottom: 28px;
-}
-h1.display .muted { color: var(--fg-muted); }
-h1.display .accent { color: var(--primary); }
-
-.lede {
-  max-width: 580px;
-  color: var(--fg-muted);
-  font-size: 15px;
+  font-size: clamp(5px, .9vw, 9px);
+  opacity: 0.55;
   margin-bottom: 48px;
+  overflow: hidden;
+  border-left: 1px solid var(--line);
+  padding-left: 14px;
 }
-
-/* Stats */
-.stats {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  padding: 24px 0;
-  margin-bottom: 80px;
-}
-.stat-num {
-  font-family: "Cabinet Grotesk", sans-serif;
-  font-weight: 800;
-  font-size: 2.1rem;
-  letter-spacing: -0.03em;
-  color: white;
-  line-height: 1;
-}
-.stat-label {
-  font-family: "JetBrains Mono", monospace; font-size: 10px;
-  letter-spacing: 0.18em; text-transform: uppercase;
-  color: var(--fg-muted); margin-top: 8px;
-}
-
-/* TOC */
-.toc {
-  border: 1px solid var(--line);
-  background: var(--surface);
-  padding: 28px 32px;
-  margin-bottom: 96px;
-}
-.toc-title {
-  font-family: "JetBrains Mono", monospace; font-size: 10px;
-  letter-spacing: 0.2em; text-transform: uppercase;
-  color: var(--fg-muted); margin-bottom: 20px;
-}
-.toc-list { list-style: none; }
-.toc-item {
-  display: flex; gap: 16px; align-items: center;
-  padding: 10px 0; border-bottom: 1px dashed var(--line);
-}
-.toc-item:last-child { border-bottom: none; }
-.toc-num {
-  font-family: "JetBrains Mono", monospace; font-size: 11px;
-  color: var(--fg-dim); letter-spacing: 0.1em; min-width: 36px;
-}
-.toc-method {
-  font-family: "JetBrains Mono", monospace; font-weight: 700;
-  font-size: 9px; letter-spacing: 0.12em;
-  padding: 3px 8px; min-width: 56px; text-align: center;
-  color: var(--bg-deep);
-}
-.toc-link {
-  color: var(--fg);
-  text-decoration: none;
-  font-weight: 500;
-  flex: 1;
-  font-size: 14px;
-}
-.toc-link:hover { color: var(--primary); }
 
 /* Folder section */
-.folder { margin-bottom: 88px; }
-.folder-header {
-  display: flex; align-items: center; gap: 16px;
+
+.folder {
+  margin-bottom: 80px;
+}
+.folder-marker {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
   margin-bottom: 28px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
 }
 .folder-tag {
-  font-family: "JetBrains Mono", monospace; font-size: 10px;
-  color: var(--fg-muted); letter-spacing: 0.18em; text-transform: uppercase;
-  white-space: nowrap;
+  font-size: 9px; letter-spacing: 0.22em; color: var(--primary);
+  text-transform: uppercase;
 }
-.folder-line { flex: 1; height: 1px; background: var(--line-strong); }
-.folder-name {
+.folder-title {
   font-family: "Cabinet Grotesk", sans-serif;
-  font-size: 1.7rem;
+  font-size: 1.55rem;
   letter-spacing: -0.025em;
-  color: white;
   font-weight: 800;
+  color: var(--fg);
+  margin-right: auto;
+}
+.folder-count {
+  font-size: 9px; letter-spacing: 0.18em; color: var(--fg-dim);
+  text-transform: uppercase;
 }
 
-/* Request card */
+/* Request entry */
+
 .request {
   border: 1px solid var(--line);
-  background: var(--surface);
-  margin-bottom: 24px;
-  transition: border-color 0.35s;
+  background: var(--paper);
+  margin-bottom: 28px;
+  position: relative;
 }
-.request:hover { border-color: var(--line-strong); }
+.request::before {
+  content: "";
+  position: absolute;
+  left: -1px; top: -1px; bottom: -1px;
+  width: 3px;
+  background: var(--line-strong);
+  transition: background .25s;
+}
+.request:hover::before { background: var(--primary-deep); }
 .request:target { border-color: var(--primary); }
+.request:target::before { background: var(--primary); }
 
 .request-head {
-  display: flex; gap: 14px; align-items: center;
-  padding: 18px 24px;
-  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 14px;
+  padding: 18px 26px;
+  border-bottom: 1px dashed var(--line);
   flex-wrap: wrap;
 }
+.request-num {
+  font-size: 10px; letter-spacing: 0.16em;
+  color: var(--fg-dim); font-weight: 700;
+}
+.request-name {
+  font-family: "Cabinet Grotesk", sans-serif;
+  font-size: 1.05rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  color: var(--fg);
+}
 
-.method, .toc-method {
-  font-family: "JetBrains Mono", monospace; font-weight: 700;
-  font-size: 11px; letter-spacing: 0.1em;
+/* Pills (kept colored - these are the brand "tags") */
+.method, .nav-pill {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  letter-spacing: 0.1em;
 }
 .method {
-  padding: 6px 12px;
+  font-size: 11px;
+  padding: 5px 11px;
   color: var(--bg-deep);
 }
-
 .m-GET     { background: var(--primary); color: var(--bg-deep); }
 .m-POST    { background: var(--secondary); color: white; }
 .m-PUT     { background: #c084fc; color: var(--bg-deep); }
@@ -251,130 +273,202 @@ h1.display .accent { color: var(--primary); }
 .m-GRPC    { background: #00bcd4; color: var(--bg-deep); }
 .m-GQL     { background: #e10098; color: white; }
 
-.request-name {
-  font-family: "Cabinet Grotesk", sans-serif;
-  font-size: 1.15rem;
-  font-weight: 500;
-  letter-spacing: -0.015em;
-  color: white;
-}
 .request-url {
-  font-family: "JetBrains Mono", monospace;
-  font-size: 12px;
+  font-size: 11.5px;
   color: var(--fg-muted);
-  flex: 1; min-width: 200px;
+  flex: 1; min-width: 220px;
   word-break: break-all;
+}
+.request-url::before {
+  content: "URL ";
+  color: var(--fg-dim); letter-spacing: 0.18em;
+  margin-right: 8px; font-size: 9px;
 }
 
 .badge {
   display: inline-block;
-  font-family: "JetBrains Mono", monospace; font-size: 9px;
-  letter-spacing: 0.14em; padding: 3px 8px;
-  border: 1px solid var(--line-strong);
-  color: var(--fg-muted);
+  font-size: 8.5px;
+  letter-spacing: 0.16em;
+  padding: 3px 7px;
+  border: 1px solid var(--primary-deep);
+  color: var(--primary);
   text-transform: uppercase;
 }
 
-.request-body { padding: 24px; }
-.section { margin-bottom: 24px; }
-.section:last-child { margin-bottom: 0; }
-.section-label {
-  font-family: "JetBrains Mono", monospace; font-size: 10px;
-  letter-spacing: 0.2em; text-transform: uppercase;
-  color: var(--fg-muted); margin-bottom: 12px;
-  display: flex; align-items: center; gap: 10px;
+.request-body { padding: 26px 26px 30px; }
+
+/* Numbered subsections (I. AUTH / II. HEADERS / ...) */
+
+.spec-section {
+  margin-bottom: 28px;
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: 24px;
 }
-.section-label::before {
-  content: ""; width: 6px; height: 6px; background: var(--primary);
+.spec-section:last-child { margin-bottom: 0; }
+.spec-section-marker {
+  font-size: 9px; letter-spacing: 0.2em;
+  color: var(--fg-dim); text-transform: uppercase;
+  padding-top: 4px;
+  border-right: 1px dashed var(--line);
+  text-align: right;
+  padding-right: 16px;
 }
+.spec-section-marker .roman {
+  display: block; color: var(--primary);
+  font-weight: 700; font-size: 11px;
+  margin-bottom: 4px;
+}
+.spec-section-body { min-width: 0; }
+
+/* dotted-leader key/value (spec-sheet style) */
 
 .kv {
-  display: grid; grid-template-columns: 220px 1fr; gap: 10px 18px;
-  font-family: "JetBrains Mono", monospace; font-size: 12px;
+  display: grid;
+  grid-template-columns: minmax(120px, 220px) 1fr;
+  gap: 4px 16px;
+  font-size: 12px;
+  align-items: baseline;
 }
-.kv-key { color: var(--fg-muted); }
-.kv-val { color: var(--fg); word-break: break-all; }
+.kv-row {
+  display: contents;
+}
+.kv-key {
+  color: var(--fg-muted);
+  position: relative;
+  overflow: hidden;
+}
+.kv-key::after {
+  content: " ........................................"
+          " ........................................";
+  color: var(--fg-dim);
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  margin-left: 6px;
+}
+.kv-val {
+  color: var(--fg);
+  word-break: break-all;
+}
 
 pre.code {
-  font-family: "JetBrains Mono", monospace; font-size: 12px;
   background: var(--bg-deep);
   border: 1px solid var(--line);
-  padding: 16px 20px;
+  padding: 14px 18px;
   overflow-x: auto;
+  font-size: 11.5px;
   color: var(--fg);
-  line-height: 1.55;
+  line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-word;
+  position: relative;
+}
+pre.code::before {
+  content: attr(data-lang);
+  position: absolute;
+  top: 8px; right: 12px;
+  font-size: 8px; letter-spacing: 0.18em;
+  color: var(--fg-dim); text-transform: uppercase;
 }
 
-footer {
-  margin-top: 120px;
-  padding-top: 28px;
-  border-top: 1px solid var(--line);
-  display: flex; justify-content: space-between; align-items: center;
-  font-family: "JetBrains Mono", monospace; font-size: 10px;
-  letter-spacing: 0.18em; text-transform: uppercase;
-  color: var(--fg-muted);
+.resp-meta {
+  font-size: 10px; letter-spacing: 0.12em; color: var(--fg-muted);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border-left: 3px solid var(--primary);
+  display: inline-block;
 }
-footer a { color: var(--primary); text-decoration: none; }
-footer a:hover { color: white; }
+.resp-meta strong { color: var(--primary); font-weight: 700; }
 
-@media (max-width: 720px) {
-  .container { padding: 32px 20px 80px; }
-  .stats { grid-template-columns: repeat(2, 1fr); }
-  .kv { grid-template-columns: 1fr; gap: 4px 0; }
-  .toc { padding: 20px; }
-  .request-head { padding: 16px; }
-  .request-body { padding: 16px; }
+/* Footer */
+
+.colophon {
+  margin-top: 100px;
+  padding-top: 24px;
+  border-top: 2px solid var(--primary);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fg-dim);
 }
+.colophon a { color: var(--primary); text-decoration: none; border-bottom: 1px dashed var(--primary-deep); }
+.colophon a:hover { color: var(--fg); }
+.colophon-glyphs { color: var(--fg-muted); }
+
+/* Mobile */
+
+@media (max-width: 880px) {
+  .shell { grid-template-columns: 1fr; }
+  aside.nav {
+    position: relative; height: auto; max-height: none;
+    border-right: none; border-bottom: 1px solid var(--line);
+  }
+  main.content { padding: 32px 22px 80px; }
+  .meta-block { grid-template-columns: 1fr; }
+  .meta-table { align-self: start; }
+  .spec-section { grid-template-columns: 1fr; gap: 8px; }
+  .spec-section-marker {
+    text-align: left; border-right: none;
+    border-left: 2px solid var(--primary);
+    padding-left: 10px; padding-right: 0;
+  }
+  .kv { grid-template-columns: 1fr; gap: 0; }
+  .kv-key::after { display: none; }
+  .ascii-strip { font-size: 5px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
 </style>
 </head>
 <body>
-<div class="grid-bg"></div>
-<div class="noise"></div>
-<div class="container">
+<div class="shell">
 
-<div class="topbar">
-  <div class="brand">
-    <div class="brand-mark"><div class="brand-dot"></div></div>
-    <span class="brand-name">FROGBITE</span>
+<aside class="nav">
+  <div class="nav-brand">
+    <div class="nav-brand-mark"><div class="nav-brand-dot"></div></div>
+    <span class="nav-brand-name">FROGBITE</span>
+    <span class="nav-brand-sub">/ DOCS</span>
   </div>
-  <div class="topbar-meta">API REFERENCE / GENERATED</div>
-</div>
+  <div class="nav-section-title">Index</div>
+{NAV}</aside>
 
-<pre class="ascii" aria-hidden="true">{ASCII}</pre>
+<main class="content">
 
-<div class="kicker"><span class="kicker-dot"></span><span>[00] / DOCUMENTATION</span></div>
+  <header class="meta-block">
+    <div>
+      <div class="meta-doc-id">DOC <strong>FB&nbsp;//&nbsp;API</strong> &nbsp;/&nbsp; REV {GENERATED_AT}</div>
+      <h1 class="meta-title">{TITLE}</h1>
+      <div class="meta-subtitle">// machine-extracted from local frogbite collection</div>
+    </div>
+    <div class="meta-table">
+      <dl>
+        <dt>Requests</dt><dd><span class="accent">{REQUEST_COUNT}</span></dd>
+        <dt>Folders</dt><dd>{FOLDER_COUNT}</dd>
+        <dt>Methods</dt><dd>{METHOD_COUNT}</dd>
+        <dt>Generated</dt><dd>{GENERATED_AT}</dd>
+      </dl>
+    </div>
+  </header>
 
-<h1 class="display">
-  Your collection,<br>
-  <span class="muted">stitched into a</span> <span class="accent">single page.</span>
-</h1>
-
-<p class="lede">Generated from your local frogbite collection. Every request, header, body, auth, gRPC method and saved sample response — laid out for humans.</p>
-
-<div class="stats">
-  <div><div class="stat-num">{REQUEST_COUNT}</div><div class="stat-label">requests</div></div>
-  <div><div class="stat-num">{FOLDER_COUNT}</div><div class="stat-label">folders</div></div>
-  <div><div class="stat-num">{METHOD_COUNT}</div><div class="stat-label">methods</div></div>
-  <div><div class="stat-num">{GENERATED_AT}</div><div class="stat-label">generated</div></div>
-</div>
-
-<div class="toc">
-  <div class="toc-title">// CONTENTS</div>
-  <ul class="toc-list">
-{TOC}  </ul>
-</div>
+  <pre class="ascii-strip" aria-hidden="true">{ASCII}</pre>
 
 {SECTIONS}
 
-<footer>
-  <span>FROGBITE / DOCS</span>
-  <a href="https://github.com/Dilgo-dev/frogbite">github.com/Dilgo-dev/frogbite</a>
-</footer>
+  <footer class="colophon">
+    <div>
+      <span class="colophon-glyphs">⌐&nbsp;</span>
+      FROGBITE DOCS / GENERATED LOCALLY / NO TELEMETRY
+    </div>
+    <a href="https://github.com/Dilgo-dev/frogbite">github.com/Dilgo-dev/frogbite</a>
+  </footer>
+</main>
 
 </div>
 </body>

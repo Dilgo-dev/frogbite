@@ -1,12 +1,13 @@
 //! Generates a single self-contained HTML reference from a frogbite
-//! collection. The visual style mirrors the frogbite-cloud landing page:
-//! near-black canvas, lime accent, `Cabinet Grotesk` + `Satoshi` +
-//! `JetBrains Mono`, grid background and noise overlay.
+//! collection. Uses the brand palette (lime on near-black) but a layout
+//! that mirrors a technical specification document, not the marketing
+//! landing page: sticky sidebar nav, numbered sections, dotted leaders.
 
 #![allow(
     clippy::too_many_lines,
     clippy::cast_possible_wrap,
-    clippy::write_with_newline
+    clippy::write_with_newline,
+    clippy::uninlined_format_args
 )]
 
 use std::collections::BTreeSet;
@@ -29,196 +30,202 @@ pub fn render_html(data: &CollectionData, title_override: Option<&str>) -> Strin
     let method_count = methods.len();
     let generated_at = current_date();
 
-    let mut toc = String::new();
+    let mut nav = String::new();
     let mut sections = String::new();
 
-    let mut idx = 0usize;
-    let mut emit_section = |label: &str, requests: &[&SavedRequest], idx: &mut usize| {
-        let folder_anchor = slug(label);
-        sections.push_str("<section class=\"folder\" id=\"folder-");
-        sections.push_str(&folder_anchor);
-        sections.push_str("\">\n  <div class=\"folder-header\">\n    <span class=\"folder-tag\">// FOLDER</span>\n    <h2 class=\"folder-name\">");
-        sections.push_str(&esc(label));
-        sections.push_str(
-            "</h2>\n    <span class=\"folder-line\"></span>\n    <span class=\"folder-tag\">",
-        );
-        let _ = write!(sections, "{} REQ", requests.len());
-        sections.push_str("</span>\n  </div>\n");
+    let mut groups: Vec<(String, Vec<&SavedRequest>)> = Vec::new();
+    for folder in &data.folders {
+        let in_folder: Vec<&SavedRequest> = data
+            .requests
+            .iter()
+            .filter(|r| r.folder_id.as_deref() == Some(folder.id.as_str()))
+            .collect();
+        if !in_folder.is_empty() {
+            groups.push((folder.name.clone(), in_folder));
+        }
+    }
+    let ungrouped: Vec<&SavedRequest> = data
+        .requests
+        .iter()
+        .filter(|r| r.folder_id.is_none())
+        .collect();
+    if !ungrouped.is_empty() {
+        groups.push(("Ungrouped".to_owned(), ungrouped));
+    }
 
-        for req in requests {
-            *idx += 1;
+    for (folder_idx, (label, requests)) in groups.iter().enumerate() {
+        let folder_no = folder_idx + 1;
+        let folder_anchor = slug(label);
+
+        let _ = write!(
+            nav,
+            "  <div class=\"nav-folder\">{:02} / {}</div>\n  <nav class=\"nav-list\">\n",
+            folder_no,
+            esc(label)
+        );
+
+        let _ = write!(
+            sections,
+            "  <section class=\"folder\" id=\"folder-{folder_anchor}\">\n    <div class=\"folder-marker\">\n      <span class=\"folder-tag\">SECTION {folder_no:02}</span>\n      <h2 class=\"folder-title\">{name}</h2>\n      <span class=\"folder-count\">{count} requests</span>\n    </div>\n",
+            folder_anchor = folder_anchor,
+            folder_no = folder_no,
+            name = esc(label),
+            count = requests.len(),
+        );
+
+        for (req_idx, req) in requests.iter().enumerate() {
+            let req_no = req_idx + 1;
+            let section_no = format!("{folder_no:02}.{req_no:02}");
             let anchor = format!("req-{}-{}", folder_anchor, slug(&req.name));
-            let num = format!("[{:02}]", *idx);
             let m = esc(&req.method);
             let name = esc(&req.name);
             let url = esc(&req.url);
 
-            // TOC entry
-            toc.push_str("<li class=\"toc-item\">\n  <span class=\"toc-num\">");
-            toc.push_str(&num);
-            toc.push_str("</span>\n  <span class=\"toc-method m-");
-            toc.push_str(&m);
-            toc.push_str("\">");
-            toc.push_str(&m);
-            toc.push_str("</span>\n  <a class=\"toc-link\" href=\"#");
-            toc.push_str(&anchor);
-            toc.push_str("\">");
-            toc.push_str(&name);
-            toc.push_str("</a>\n</li>\n");
+            let _ = write!(
+                nav,
+                "    <a class=\"nav-item\" href=\"#{anchor}\">\n      <span class=\"nav-num\">{section_no}</span>\n      <span class=\"nav-pill m-{m}\">{m}</span>\n      <span class=\"nav-name\">{name}</span>\n    </a>\n",
+                anchor = anchor,
+                section_no = section_no,
+                m = m,
+                name = name,
+            );
 
-            // Section card
-            sections.push_str("  <article class=\"request\" id=\"");
-            sections.push_str(&anchor);
-            sections
-                .push_str("\">\n    <div class=\"request-head\">\n      <span class=\"method m-");
-            sections.push_str(&m);
-            sections.push_str("\">");
-            sections.push_str(&m);
-            sections.push_str("</span>\n      <h3 class=\"request-name\">");
-            sections.push_str(&name);
-            sections.push_str("</h3>\n      <code class=\"request-url\">");
-            sections.push_str(&url);
-            sections.push_str("</code>\n");
+            let _ = write!(
+                sections,
+                "    <article class=\"request\" id=\"{anchor}\">\n      <div class=\"request-head\">\n        <span class=\"request-num\">{section_no}</span>\n        <span class=\"method m-{m}\">{m}</span>\n        <h3 class=\"request-name\">{name}</h3>\n        <code class=\"request-url\">{url}</code>\n",
+                anchor = anchor,
+                section_no = section_no,
+                m = m,
+                name = name,
+                url = url,
+            );
 
             for badge in request_badges(req) {
-                sections.push_str("      <span class=\"badge\">");
-                sections.push_str(&esc(&badge));
-                sections.push_str("</span>\n");
+                let _ = write!(
+                    sections,
+                    "        <span class=\"badge\">{}</span>\n",
+                    esc(&badge)
+                );
             }
 
-            sections.push_str("    </div>\n    <div class=\"request-body\">\n");
+            sections.push_str("      </div>\n      <div class=\"request-body\">\n");
 
-            // Auth
+            let mut sub_no = 0usize;
+
             if !matches!(req.auth, Auth::None) {
-                sections.push_str(
-                    "      <div class=\"section\">\n        <div class=\"section-label\">Auth</div>\n",
-                );
+                sub_no += 1;
+                emit_spec_open(&mut sections, sub_no, "Auth");
                 let (kind, fields) = describe_auth(&req.auth);
-                sections.push_str("        <div class=\"kv\">\n");
-                write!(
+                sections.push_str("          <div class=\"kv\">\n");
+                let _ = write!(
                     sections,
-                    "          <div class=\"kv-key\">type</div><div class=\"kv-val\">{}</div>\n",
+                    "            <div class=\"kv-row\"><div class=\"kv-key\">type</div><div class=\"kv-val\">{}</div></div>\n",
                     esc(kind)
-                )
-                .ok();
+                );
                 for (k, v) in fields {
-                    write!(
+                    let _ = write!(
                         sections,
-                        "          <div class=\"kv-key\">{}</div><div class=\"kv-val\">{}</div>\n",
+                        "            <div class=\"kv-row\"><div class=\"kv-key\">{}</div><div class=\"kv-val\">{}</div></div>\n",
                         esc(&k),
                         esc(&v)
-                    )
-                    .ok();
+                    );
                 }
-                sections.push_str("        </div>\n      </div>\n");
+                sections.push_str("          </div>\n");
+                emit_spec_close(&mut sections);
             }
 
-            // Headers
             if !req.headers.is_empty() {
+                sub_no += 1;
+                emit_spec_open(&mut sections, sub_no, "Headers");
                 let mut entries: Vec<(&String, &String)> = req.headers.iter().collect();
                 entries.sort_by(|a, b| a.0.cmp(b.0));
-                sections.push_str(
-                    "      <div class=\"section\">\n        <div class=\"section-label\">Headers</div>\n        <div class=\"kv\">\n",
-                );
+                sections.push_str("          <div class=\"kv\">\n");
                 for (k, v) in entries {
-                    write!(
+                    let _ = write!(
                         sections,
-                        "          <div class=\"kv-key\">{}</div><div class=\"kv-val\">{}</div>\n",
+                        "            <div class=\"kv-row\"><div class=\"kv-key\">{}</div><div class=\"kv-val\">{}</div></div>\n",
                         esc(k),
                         esc(v)
-                    )
-                    .ok();
+                    );
                 }
-                sections.push_str("        </div>\n      </div>\n");
+                sections.push_str("          </div>\n");
+                emit_spec_close(&mut sections);
             }
 
-            // Body
-            let body_label = match req.body_type {
-                BodyType::Raw => format!("Body · raw / {}", req.content_type.label()),
-                BodyType::Form => "Body · form-urlencoded".to_owned(),
-                BodyType::Multipart => "Body · multipart".to_owned(),
-            };
             match req.body_type {
                 BodyType::Raw if !req.body.is_empty() => {
-                    sections.push_str("      <div class=\"section\">\n");
-                    write!(
+                    sub_no += 1;
+                    let label = format!("Body / {}", req.content_type.label());
+                    emit_spec_open(&mut sections, sub_no, &label);
+                    let lang = req.content_type.label().to_lowercase();
+                    let _ = write!(
                         sections,
-                        "        <div class=\"section-label\">{}</div>\n",
-                        esc(&body_label)
-                    )
-                    .ok();
-                    write!(
-                        sections,
-                        "        <pre class=\"code\">{}</pre>\n      </div>\n",
+                        "          <pre class=\"code\" data-lang=\"{}\">{}</pre>\n",
+                        esc(&lang),
                         esc(&req.body)
-                    )
-                    .ok();
+                    );
+                    emit_spec_close(&mut sections);
                 }
                 BodyType::Form | BodyType::Multipart if !req.form_data.is_empty() => {
-                    sections.push_str("      <div class=\"section\">\n");
-                    write!(
-                        sections,
-                        "        <div class=\"section-label\">{}</div>\n        <div class=\"kv\">\n",
-                        esc(&body_label)
-                    )
-                    .ok();
+                    sub_no += 1;
+                    let label = if matches!(req.body_type, BodyType::Form) {
+                        "Body / form-urlencoded"
+                    } else {
+                        "Body / multipart"
+                    };
+                    emit_spec_open(&mut sections, sub_no, label);
+                    sections.push_str("          <div class=\"kv\">\n");
                     for (k, v) in &req.form_data {
-                        write!(
+                        let _ = write!(
                             sections,
-                            "          <div class=\"kv-key\">{}</div><div class=\"kv-val\">{}</div>\n",
+                            "            <div class=\"kv-row\"><div class=\"kv-key\">{}</div><div class=\"kv-val\">{}</div></div>\n",
                             esc(k),
                             esc(v)
-                        )
-                        .ok();
+                        );
                     }
-                    sections.push_str("        </div>\n      </div>\n");
+                    sections.push_str("          </div>\n");
+                    emit_spec_close(&mut sections);
                 }
                 _ => {}
             }
 
-            // gRPC details
             if req.method == "GRPC" && (!req.proto_path.is_empty() || !req.grpc_method.is_empty()) {
-                sections.push_str(
-                    "      <div class=\"section\">\n        <div class=\"section-label\">gRPC</div>\n        <div class=\"kv\">\n",
-                );
+                sub_no += 1;
+                emit_spec_open(&mut sections, sub_no, "gRPC");
+                sections.push_str("          <div class=\"kv\">\n");
                 if !req.proto_path.is_empty() {
-                    write!(
+                    let _ = write!(
                         sections,
-                        "          <div class=\"kv-key\">proto</div><div class=\"kv-val\">{}</div>\n",
+                        "            <div class=\"kv-row\"><div class=\"kv-key\">proto</div><div class=\"kv-val\">{}</div></div>\n",
                         esc(&req.proto_path)
-                    )
-                    .ok();
+                    );
                 }
                 if !req.grpc_method.is_empty() {
-                    write!(
+                    let _ = write!(
                         sections,
-                        "          <div class=\"kv-key\">method</div><div class=\"kv-val\">{}</div>\n",
+                        "            <div class=\"kv-row\"><div class=\"kv-key\">method</div><div class=\"kv-val\">{}</div></div>\n",
                         esc(&req.grpc_method)
-                    )
-                    .ok();
+                    );
                 }
-                sections.push_str("        </div>\n      </div>\n");
+                sections.push_str("          </div>\n");
+                emit_spec_close(&mut sections);
             }
 
-            // GraphQL details
             if req.method == "GQL" && !req.gql_variables.is_empty() {
-                sections.push_str(
-                    "      <div class=\"section\">\n        <div class=\"section-label\">Variables</div>\n",
-                );
-                write!(
+                sub_no += 1;
+                emit_spec_open(&mut sections, sub_no, "Variables");
+                let _ = write!(
                     sections,
-                    "        <pre class=\"code\">{}</pre>\n      </div>\n",
+                    "          <pre class=\"code\" data-lang=\"json\">{}</pre>\n",
                     esc(&req.gql_variables)
-                )
-                .ok();
+                );
+                emit_spec_close(&mut sections);
             }
 
-            // Last response sample
             if let Some(resp) = &req.last_response {
                 if !resp.body.is_empty() {
-                    sections.push_str(
-                        "      <div class=\"section\">\n        <div class=\"section-label\">Sample response</div>\n",
-                    );
+                    sub_no += 1;
+                    emit_spec_open(&mut sections, sub_no, "Sample response");
                     let pretty = serde_json::from_str::<serde_json::Value>(&resp.body)
                         .ok()
                         .and_then(|v| serde_json::to_string_pretty(&v).ok())
@@ -232,49 +239,33 @@ pub fn render_html(data: &CollectionData, title_override: Option<&str>) -> Strin
                     } else {
                         pretty
                     };
-                    write!(
+                    let _ = write!(
                         sections,
-                        "        <div class=\"section-label\" style=\"margin-top:8px\">{} {} · {} ms</div>\n",
+                        "          <div class=\"resp-meta\"><strong>{}</strong> {} / {} ms</div>\n",
                         resp.status,
                         esc(&resp.status_text),
                         resp.duration_ms,
-                    )
-                    .ok();
-                    write!(
+                    );
+                    let _ = write!(
                         sections,
-                        "        <pre class=\"code\">{}</pre>\n      </div>\n",
+                        "          <pre class=\"code\" data-lang=\"json\">{}</pre>\n",
                         esc(&truncated)
-                    )
-                    .ok();
+                    );
+                    emit_spec_close(&mut sections);
                 }
             }
 
-            sections.push_str("    </div>\n  </article>\n");
+            if sub_no == 0 {
+                sections.push_str("        <div class=\"spec-section\"><div class=\"spec-section-marker\"><span class=\"roman\">-</span>EMPTY</div><div class=\"spec-section-body\" style=\"color:var(--fg-dim);font-style:italic\">No additional metadata.</div></div>\n");
+            }
+
+            sections.push_str("      </div>\n    </article>\n");
         }
 
-        sections.push_str("</section>\n");
-    };
+        sections.push_str("  </section>\n");
+        nav.push_str("  </nav>\n");
+    }
 
-    // Group: each folder, then ungrouped
-    for folder in &data.folders {
-        let in_folder: Vec<&SavedRequest> = data
-            .requests
-            .iter()
-            .filter(|r| r.folder_id.as_deref() == Some(folder.id.as_str()))
-            .collect();
-        if in_folder.is_empty() {
-            continue;
-        }
-        emit_section(&folder.name, &in_folder, &mut idx);
-    }
-    let ungrouped: Vec<&SavedRequest> = data
-        .requests
-        .iter()
-        .filter(|r| r.folder_id.is_none())
-        .collect();
-    if !ungrouped.is_empty() {
-        emit_section("Ungrouped", &ungrouped, &mut idx);
-    }
     let template = include_str!("docs_template.html");
     template
         .replace("{TITLE}", &esc(title))
@@ -283,8 +274,35 @@ pub fn render_html(data: &CollectionData, title_override: Option<&str>) -> Strin
         .replace("{FOLDER_COUNT}", &folder_count.to_string())
         .replace("{METHOD_COUNT}", &method_count.to_string())
         .replace("{GENERATED_AT}", &generated_at)
-        .replace("{TOC}", &toc)
+        .replace("{NAV}", &nav)
         .replace("{SECTIONS}", &sections)
+}
+
+fn emit_spec_open(out: &mut String, n: usize, label: &str) {
+    let _ = write!(
+        out,
+        "        <div class=\"spec-section\">\n          <div class=\"spec-section-marker\"><span class=\"roman\">{}.</span>{}</div>\n          <div class=\"spec-section-body\">\n",
+        roman_numeral(n),
+        esc(label),
+    );
+}
+
+fn emit_spec_close(out: &mut String) {
+    out.push_str("          </div>\n        </div>\n");
+}
+
+const fn roman_numeral(n: usize) -> &'static str {
+    match n {
+        1 => "I",
+        2 => "II",
+        3 => "III",
+        4 => "IV",
+        5 => "V",
+        6 => "VI",
+        7 => "VII",
+        8 => "VIII",
+        _ => "IX",
+    }
 }
 
 fn request_badges(req: &SavedRequest) -> Vec<String> {
@@ -330,9 +348,9 @@ fn describe_auth(auth: &Auth) -> (&'static str, Vec<(String, String)>) {
 
 fn redact(s: &str) -> String {
     if s.len() <= 6 {
-        "•".repeat(s.len())
+        "*".repeat(s.len())
     } else {
-        format!("{}…{}", &s[..3], "•".repeat(8))
+        format!("{}...{}", &s[..3], "*".repeat(8))
     }
 }
 
@@ -374,8 +392,6 @@ fn current_date() -> String {
     format!("{y:04}.{m:02}.{d:02}")
 }
 
-/// Converts days since 1970-01-01 to (year, month, day). Civil-from-days
-/// algorithm by Howard Hinnant.
 const fn epoch_days_to_ymd(days: i64) -> (i32, u32, u32) {
     let z = days + 719_468;
     let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
