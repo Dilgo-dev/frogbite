@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::process::ExitCode;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 
 use clap::{Args, Subcommand, ValueEnum};
 use frogbite::core::http::{HttpResponse, RequestBody, RequestOptions, send_request};
@@ -19,8 +21,29 @@ pub enum Command {
     Run(RunArgs),
     /// Generate a styled HTML reference from the saved collection
     Docs(DocsArgs),
+    /// Stress / rate-limit a saved request with a worker pool
+    Bench(BenchArgs),
     /// Check for and install the latest frogbite release
     Update,
+}
+
+#[derive(Debug, Args)]
+pub struct BenchArgs {
+    /// Name of the saved request to hammer
+    #[arg(long, value_name = "NAME")]
+    pub name: String,
+    /// Total number of requests to send
+    #[arg(short = 'n', long, default_value_t = 100)]
+    pub requests: usize,
+    /// Number of parallel workers
+    #[arg(short = 'c', long, default_value_t = 10)]
+    pub concurrency: usize,
+    /// Delay between requests on each worker, in milliseconds
+    #[arg(long, default_value_t = 0)]
+    pub delay: u64,
+    /// Output format
+    #[arg(long, value_enum, default_value_t = OutputFormat::Pretty)]
+    pub format: OutputFormat,
 }
 
 #[derive(Debug, Args)]
@@ -96,6 +119,7 @@ pub fn execute(cmd: &Command) -> ExitCode {
         Command::Send(args) => run_send(args),
         Command::Run(args) => run_collection(args),
         Command::Docs(args) => run_docs(args),
+        Command::Bench(args) => run_bench(args),
         Command::Update => run_update(),
     };
     match result {
@@ -421,6 +445,203 @@ fn send_saved(req: &SavedRequest) -> Result<HttpResponse, String> {
         proxy_url: req.proxy_url.clone(),
     };
     send_request(&opts)
+}
+
+fn run_bench(args: &BenchArgs) -> Result<ExitCode, String> {
+    if args.requests == 0 {
+        return Err("--requests must be > 0".into());
+    }
+    if args.concurrency == 0 {
+        return Err("--concurrency must be > 0".into());
+    }
+    let data = collections::load();
+    let req = data
+        .requests
+        .iter()
+        .find(|r| r.name == args.name)
+        .ok_or_else(|| format!("no saved request named '{}'", args.name))?
+        .clone();
+
+    let total = args.requests;
+    let delay = std::time::Duration::from_millis(args.delay);
+    let workers = args.concurrency.min(total);
+
+    let counter = Arc::new(AtomicUsize::new(0));
+    let results: Arc<Mutex<Vec<Outcome>>> = Arc::new(Mutex::new(Vec::with_capacity(total)));
+    let req_arc = Arc::new(req);
+
+    let started = std::time::Instant::now();
+    let mut handles = Vec::with_capacity(workers);
+    for _ in 0..workers {
+        let counter = Arc::clone(&counter);
+        let results = Arc::clone(&results);
+        let req = Arc::clone(&req_arc);
+        handles.push(std::thread::spawn(move || {
+            loop {
+                let i = counter.fetch_add(1, Ordering::Relaxed);
+                if i >= total {
+                    break;
+                }
+                let outcome = match send_saved(&req) {
+                    Ok(r) => Outcome::Ok {
+                        status: r.status,
+                        ms: r.duration_ms,
+                    },
+                    Err(_) => Outcome::Err,
+                };
+                if let Ok(mut g) = results.lock() {
+                    g.push(outcome);
+                }
+                if !delay.is_zero() {
+                    std::thread::sleep(delay);
+                }
+            }
+        }));
+    }
+    for h in handles {
+        let _ = h.join();
+    }
+    let wall = started.elapsed();
+
+    let outcomes = results.lock().map_err(|e| format!("lock: {e}"))?.clone();
+    let summary = bench_summary(&outcomes, wall);
+
+    match args.format {
+        OutputFormat::Pretty => print_bench_pretty(&summary, args, &req_arc.name),
+        OutputFormat::Json | OutputFormat::Minimal => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&summary).unwrap_or_default()
+            );
+        }
+    }
+
+    if summary.errors > 0 {
+        Ok(ExitCode::from(1))
+    } else {
+        Ok(ExitCode::SUCCESS)
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+struct BenchSummary {
+    total: usize,
+    errors: usize,
+    wall_ms: u128,
+    rps: f64,
+    min_ms: u128,
+    max_ms: u128,
+    mean_ms: f64,
+    p50_ms: u128,
+    p95_ms: u128,
+    p99_ms: u128,
+    status_counts: std::collections::BTreeMap<u16, usize>,
+}
+
+fn bench_summary<O: Copy + BenchOutcome>(
+    outcomes: &[O],
+    wall: std::time::Duration,
+) -> BenchSummary {
+    let total = outcomes.len();
+    let mut errors = 0usize;
+    let mut durations: Vec<u128> = Vec::with_capacity(total);
+    let mut status_counts: std::collections::BTreeMap<u16, usize> =
+        std::collections::BTreeMap::new();
+    for o in outcomes {
+        match o.as_outcome() {
+            (None, _) => errors += 1,
+            (Some(status), Some(ms)) => {
+                durations.push(ms);
+                *status_counts.entry(status).or_insert(0) += 1;
+            }
+            _ => {}
+        }
+    }
+    durations.sort_unstable();
+    let pct = |p: f64| -> u128 {
+        if durations.is_empty() {
+            return 0;
+        }
+        let idx = ((durations.len() as f64 - 1.0) * p).round() as usize;
+        durations[idx.min(durations.len() - 1)]
+    };
+    let sum: u128 = durations.iter().sum();
+    let mean = if durations.is_empty() {
+        0.0
+    } else {
+        sum as f64 / durations.len() as f64
+    };
+    let wall_ms = wall.as_millis();
+    let rps = if wall.as_secs_f64() > 0.0 {
+        total as f64 / wall.as_secs_f64()
+    } else {
+        0.0
+    };
+    BenchSummary {
+        total,
+        errors,
+        wall_ms,
+        rps,
+        min_ms: durations.first().copied().unwrap_or(0),
+        max_ms: durations.last().copied().unwrap_or(0),
+        mean_ms: mean,
+        p50_ms: pct(0.50),
+        p95_ms: pct(0.95),
+        p99_ms: pct(0.99),
+        status_counts,
+    }
+}
+
+#[derive(Clone, Copy)]
+enum Outcome {
+    Ok { status: u16, ms: u128 },
+    Err,
+}
+
+trait BenchOutcome {
+    fn as_outcome(&self) -> (Option<u16>, Option<u128>);
+}
+
+impl BenchOutcome for Outcome {
+    fn as_outcome(&self) -> (Option<u16>, Option<u128>) {
+        match *self {
+            Self::Ok { status, ms } => (Some(status), Some(ms)),
+            Self::Err => (None, None),
+        }
+    }
+}
+
+fn print_bench_pretty(s: &BenchSummary, args: &BenchArgs, name: &str) {
+    println!();
+    println!("  bench  {name}");
+    println!(
+        "  spec   {} requests / {} workers / {} ms delay",
+        args.requests, args.concurrency, args.delay
+    );
+    println!();
+    println!("  total      {:>8}", s.total);
+    println!("  errors     {:>8}", s.errors);
+    println!("  wall       {:>8} ms", s.wall_ms);
+    println!("  rps        {:>8.1}", s.rps);
+    println!();
+    println!("  latency (ms)");
+    println!("    min      {:>8}", s.min_ms);
+    println!("    mean     {:>8.1}", s.mean_ms);
+    println!("    p50      {:>8}", s.p50_ms);
+    println!("    p95      {:>8}", s.p95_ms);
+    println!("    p99      {:>8}", s.p99_ms);
+    println!("    max      {:>8}", s.max_ms);
+    println!();
+    println!("  status code distribution");
+    if s.status_counts.is_empty() {
+        println!("    (none)");
+    } else {
+        for (code, count) in &s.status_counts {
+            let pct = (*count as f64 / s.total as f64) * 100.0;
+            println!("    {code:>3}    {count:>6}  ({pct:>5.1}%)");
+        }
+    }
+    println!();
 }
 
 fn run_docs(args: &DocsArgs) -> Result<ExitCode, String> {
