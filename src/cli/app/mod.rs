@@ -15,6 +15,7 @@ struct PendingRequest {
     url: String,
     resolved_url: String,
     body: String,
+    request_name: Option<String>,
 }
 
 use crate::collections::{self, Auth, BodyType, CollectionData, ContentType, Folder, SavedRequest};
@@ -195,6 +196,7 @@ pub struct App {
     pub tls_popup_selected: usize,
     pub tls_editing: bool,
     pub tls_edit_buffer: String,
+    pub last_responses: HashMap<String, String>,
     pub cookie_store: CookieStore,
     pub cookies_popup_open: bool,
     pub cookies_popup_selected: usize,
@@ -307,6 +309,7 @@ impl App {
             tls_popup_selected: 0,
             tls_editing: false,
             tls_edit_buffer: String::new(),
+            last_responses: HashMap::new(),
             cookie_store: cookies::load(),
             cookies_popup_open: false,
             cookies_popup_selected: 0,
@@ -1387,18 +1390,70 @@ impl App {
     }
 
     fn resolve_variables(&self, input: &str) -> String {
+        let with_chain = self.resolve_chain_refs(input);
         let Some(env_id) = &self.active_env_id else {
-            return input.to_owned();
+            return with_chain;
         };
         let Some(env) = self.environments.iter().find(|e| e.id == *env_id) else {
-            return input.to_owned();
+            return with_chain;
         };
-        let mut result = input.to_owned();
+        let mut result = with_chain;
         for var in &env.variables {
             let pattern = format!("{{{{{}}}}}", var.key);
             result = result.replace(&pattern, &var.value);
         }
         result
+    }
+
+    /// Expands `{{$res:RequestName.path.to.field}}` markers using the bodies
+    /// of previously sent requests stored in `self.last_responses`.
+    fn resolve_chain_refs(&self, input: &str) -> String {
+        const OPEN: &str = "{{$res:";
+        const CLOSE: &str = "}}";
+        let mut out = String::with_capacity(input.len());
+        let mut rest = input;
+        while let Some(start) = rest.find(OPEN) {
+            out.push_str(&rest[..start]);
+            let after = &rest[start + OPEN.len()..];
+            let Some(end) = after.find(CLOSE) else {
+                out.push_str(&rest[start..]);
+                return out;
+            };
+            let expr = &after[..end];
+            out.push_str(&self.lookup_chain_expr(expr));
+            rest = &after[end + CLOSE.len()..];
+        }
+        out.push_str(rest);
+        out
+    }
+
+    fn lookup_chain_expr(&self, expr: &str) -> String {
+        let (name, path) = expr
+            .split_once('.')
+            .map_or((expr, ""), |(n, p)| (n.trim(), p.trim()));
+        let Some(body) = self.last_responses.get(name) else {
+            return format!("{{{{$res:{expr}}}}}");
+        };
+        if path.is_empty() {
+            return body.clone();
+        }
+        let Ok(value) = serde_json::from_str::<serde_json::Value>(body) else {
+            return format!("{{{{$res:{expr}}}}}");
+        };
+        let mut current = &value;
+        for segment in path.split('.') {
+            let next = segment
+                .parse::<usize>()
+                .map_or_else(|_| current.get(segment), |idx| current.get(idx));
+            let Some(next) = next else {
+                return format!("{{{{$res:{expr}}}}}");
+            };
+            current = next;
+        }
+        match current {
+            serde_json::Value::String(s) => s.clone(),
+            other => other.to_string(),
+        }
     }
 
     // -- Search --
@@ -1687,12 +1742,19 @@ impl App {
             let _ = tx.send(result);
         });
 
+        let request_name = self.active_request_id.as_ref().and_then(|id| {
+            self.requests
+                .iter()
+                .find(|r| &r.id == id)
+                .map(|r| r.name.clone())
+        });
         self.pending = Some(PendingRequest {
             rx,
             method: self.method.as_str().to_owned(),
             url: self.url.clone(),
             resolved_url: resolved_for_pending,
             body: self.body.clone(),
+            request_name,
         });
     }
 
@@ -1708,6 +1770,9 @@ impl App {
                             .ingest(&pending.resolved_url, &resp.set_cookies);
                         self.cookie_store.purge_expired();
                         cookies::save(&self.cookie_store);
+                    }
+                    if let Some(name) = &pending.request_name {
+                        self.last_responses.insert(name.clone(), resp.body.clone());
                     }
                 }
                 let entry = HistoryEntry {
