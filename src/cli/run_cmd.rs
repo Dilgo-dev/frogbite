@@ -8,6 +8,7 @@ use serde_json::json;
 use crate::assertions;
 use crate::collections::{self, Auth, BodyType, ContentType, SavedRequest};
 use crate::curl::base64;
+use crate::docs;
 use crate::update;
 
 #[derive(Debug, Subcommand)]
@@ -16,8 +17,25 @@ pub enum Command {
     Send(SendArgs),
     /// Run the saved collection as a test suite
     Run(RunArgs),
+    /// Generate a styled HTML reference from the saved collection
+    Docs(DocsArgs),
     /// Check for and install the latest frogbite release
     Update,
+}
+
+#[derive(Debug, Args)]
+pub struct DocsArgs {
+    /// Output HTML file path
+    #[arg(
+        short = 'o',
+        long = "out",
+        value_name = "PATH",
+        default_value = "frogbite-api.html"
+    )]
+    pub out: std::path::PathBuf,
+    /// Override the document title
+    #[arg(long, value_name = "TITLE")]
+    pub title: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum, Default)]
@@ -77,6 +95,7 @@ pub fn execute(cmd: &Command) -> ExitCode {
     let result = match cmd {
         Command::Send(args) => run_send(args),
         Command::Run(args) => run_collection(args),
+        Command::Docs(args) => run_docs(args),
         Command::Update => run_update(),
     };
     match result {
@@ -402,6 +421,14 @@ fn send_saved(req: &SavedRequest) -> Result<HttpResponse, String> {
         proxy_url: req.proxy_url.clone(),
     };
     send_request(&opts)
+}
+
+fn run_docs(args: &DocsArgs) -> Result<ExitCode, String> {
+    let data = collections::load();
+    let html = docs::render_html(&data, args.title.as_deref());
+    std::fs::write(&args.out, html).map_err(|e| format!("write {}: {e}", args.out.display()))?;
+    println!("wrote {}", args.out.display());
+    Ok(ExitCode::SUCCESS)
 }
 
 fn apply_auth(auth: &Auth, headers: &mut HashMap<String, String>) {

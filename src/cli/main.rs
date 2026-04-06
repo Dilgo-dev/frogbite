@@ -3,6 +3,7 @@ mod assertions;
 mod collections;
 mod cookies;
 mod curl;
+mod docs;
 mod environments;
 mod history;
 mod postman;
