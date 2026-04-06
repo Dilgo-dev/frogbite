@@ -357,7 +357,6 @@ pub(super) fn draw_env_popup(frame: &mut Frame, app: &App) {
     }
 }
 
-#[allow(clippy::too_many_lines)]
 pub(super) fn draw_assertions_popup(frame: &mut Frame, app: &App) {
     let area = frame.area();
     let popup_w = area.width.saturating_sub(6).min(100);
@@ -387,46 +386,53 @@ pub(super) fn draw_assertions_popup(frame: &mut Frame, app: &App) {
     frame.render_widget(block, popup_area);
 
     if app.assertions.editing {
-        let lines = vec![
-            Line::default(),
-            Line::from(Span::styled(
-                "  Examples:",
-                Style::default().fg(MUTED).italic(),
-            )),
-            Line::from(Span::styled(
-                "    status == 200",
-                Style::default().fg(MUTED),
-            )),
-            Line::from(Span::styled(
-                "    body contains \"hello\"",
-                Style::default().fg(MUTED),
-            )),
-            Line::from(Span::styled(
-                "    header Content-Type contains json",
-                Style::default().fg(MUTED),
-            )),
-            Line::from(Span::styled(
-                "    json $.token != \"\"",
-                Style::default().fg(MUTED),
-            )),
-            Line::default(),
-            Line::from(vec![
-                Span::styled("  > ", Style::default().fg(GREEN)),
-                Span::styled(
-                    format!("{}\u{2588}", &app.assertions.edit_buffer),
-                    Style::default().fg(FG),
-                ),
-            ]),
-            Line::default(),
-            Line::from(Span::styled(
-                "  Enter:save  Esc:cancel",
-                Style::default().fg(MUTED),
-            )),
-        ];
-        frame.render_widget(Paragraph::new(Text::from(lines)), inner);
-        return;
+        draw_assertion_editor(frame, app, inner);
+    } else {
+        draw_assertions_list(frame, app, inner);
     }
+}
 
+fn draw_assertion_editor(frame: &mut Frame, app: &App, inner: Rect) {
+    let lines = vec![
+        Line::default(),
+        Line::from(Span::styled(
+            "  Examples:",
+            Style::default().fg(MUTED).italic(),
+        )),
+        Line::from(Span::styled(
+            "    status == 200",
+            Style::default().fg(MUTED),
+        )),
+        Line::from(Span::styled(
+            "    body contains \"hello\"",
+            Style::default().fg(MUTED),
+        )),
+        Line::from(Span::styled(
+            "    header Content-Type contains json",
+            Style::default().fg(MUTED),
+        )),
+        Line::from(Span::styled(
+            "    json $.token != \"\"",
+            Style::default().fg(MUTED),
+        )),
+        Line::default(),
+        Line::from(vec![
+            Span::styled("  > ", Style::default().fg(GREEN)),
+            Span::styled(
+                format!("{}\u{2588}", &app.assertions.edit_buffer),
+                Style::default().fg(FG),
+            ),
+        ]),
+        Line::default(),
+        Line::from(Span::styled(
+            "  Enter:save  Esc:cancel",
+            Style::default().fg(MUTED),
+        )),
+    ];
+    frame.render_widget(Paragraph::new(Text::from(lines)), inner);
+}
+
+fn draw_assertions_list(frame: &mut Frame, app: &App, inner: Rect) {
     let mut y_pos = inner.y;
     if app.assertions.exprs.is_empty() {
         frame.render_widget(
@@ -477,7 +483,6 @@ pub(super) fn draw_assertions_popup(frame: &mut Frame, app: &App) {
     );
 }
 
-#[allow(clippy::too_many_lines)]
 pub(super) fn draw_extractors_popup(frame: &mut Frame, app: &App) {
     let area = frame.area();
     let popup_w = area.width.saturating_sub(6).min(90);
@@ -503,57 +508,64 @@ pub(super) fn draw_extractors_popup(frame: &mut Frame, app: &App) {
     frame.render_widget(block, popup_area);
 
     if app.extractors.editor.editing {
-        let lines = vec![
-            Line::default(),
-            Line::from(Span::styled(
-                "  Variable name (used as {{name}}):",
-                Style::default().fg(MUTED),
-            )),
-            Line::from(vec![
-                Span::raw("  "),
-                Span::styled(
-                    if app.extractors.editor.edit_field == 0 {
-                        format!("{}\u{2588}", app.extractors.editor.edit_key_buf)
-                    } else {
-                        app.extractors.editor.edit_key_buf.clone()
-                    },
-                    Style::default().fg(if app.extractors.editor.edit_field == 0 {
-                        GREEN
-                    } else {
-                        FG
-                    }),
-                ),
-            ]),
-            Line::default(),
-            Line::from(Span::styled(
-                "  JSONPath (e.g. $.token, data.users[0].id):",
-                Style::default().fg(MUTED),
-            )),
-            Line::from(vec![
-                Span::raw("  "),
-                Span::styled(
-                    if app.extractors.editor.edit_field == 1 {
-                        format!("{}\u{2588}", app.extractors.editor.edit_value_buf)
-                    } else {
-                        app.extractors.editor.edit_value_buf.clone()
-                    },
-                    Style::default().fg(if app.extractors.editor.edit_field == 1 {
-                        GREEN
-                    } else {
-                        FG
-                    }),
-                ),
-            ]),
-            Line::default(),
-            Line::from(Span::styled(
-                "  Tab:switch  Enter:save  Esc:cancel",
-                Style::default().fg(MUTED),
-            )),
-        ];
-        frame.render_widget(Paragraph::new(Text::from(lines)), inner);
-        return;
+        draw_extractor_editor(frame, app, inner);
+    } else {
+        draw_extractors_list(frame, app, inner);
     }
+}
 
+fn draw_extractor_editor(frame: &mut Frame, app: &App, inner: Rect) {
+    let lines = vec![
+        Line::default(),
+        Line::from(Span::styled(
+            "  Variable name (used as {{name}}):",
+            Style::default().fg(MUTED),
+        )),
+        Line::from(vec![
+            Span::raw("  "),
+            Span::styled(
+                if app.extractors.editor.edit_field == 0 {
+                    format!("{}\u{2588}", app.extractors.editor.edit_key_buf)
+                } else {
+                    app.extractors.editor.edit_key_buf.clone()
+                },
+                Style::default().fg(if app.extractors.editor.edit_field == 0 {
+                    GREEN
+                } else {
+                    FG
+                }),
+            ),
+        ]),
+        Line::default(),
+        Line::from(Span::styled(
+            "  JSONPath (e.g. $.token, data.users[0].id):",
+            Style::default().fg(MUTED),
+        )),
+        Line::from(vec![
+            Span::raw("  "),
+            Span::styled(
+                if app.extractors.editor.edit_field == 1 {
+                    format!("{}\u{2588}", app.extractors.editor.edit_value_buf)
+                } else {
+                    app.extractors.editor.edit_value_buf.clone()
+                },
+                Style::default().fg(if app.extractors.editor.edit_field == 1 {
+                    GREEN
+                } else {
+                    FG
+                }),
+            ),
+        ]),
+        Line::default(),
+        Line::from(Span::styled(
+            "  Tab:switch  Enter:save  Esc:cancel",
+            Style::default().fg(MUTED),
+        )),
+    ];
+    frame.render_widget(Paragraph::new(Text::from(lines)), inner);
+}
+
+fn draw_extractors_list(frame: &mut Frame, app: &App, inner: Rect) {
     let mut y_pos = inner.y;
     if app.extractors.editor.entries.is_empty() {
         frame.render_widget(

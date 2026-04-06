@@ -62,15 +62,7 @@ fn error_chain(err: &dyn std::error::Error) -> String {
     parts.join(" -> ")
 }
 
-#[allow(clippy::too_many_lines)]
-pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
-    let timeout_secs = if opts.timeout_secs == 0 {
-        30
-    } else {
-        opts.timeout_secs
-    };
-    // We follow redirects manually so we can capture Set-Cookie headers and
-    // the URL chain at every hop.
+fn build_client(opts: &RequestOptions, timeout_secs: u64) -> Result<Client, String> {
     let mut builder = Client::builder()
         .timeout(Duration::from_secs(timeout_secs))
         .redirect(redirect::Policy::none());
@@ -106,9 +98,76 @@ pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
         _ => {}
     }
 
-    let client = builder
+    builder
         .build()
-        .map_err(|e| format!("Failed to create client: {e}"))?;
+        .map_err(|e| format!("Failed to create client: {e}"))
+}
+
+fn send_one_hop(
+    client: &Client,
+    method: &Method,
+    url: &str,
+    headers: &HashMap<String, String>,
+    body: Option<&RequestBody>,
+) -> Result<reqwest::blocking::Response, reqwest::Error> {
+    let mut req = client.request(method.clone(), url);
+    for (k, v) in headers {
+        req = req.header(k.as_str(), v.as_str());
+    }
+    match body {
+        Some(RequestBody::Raw(text)) => {
+            req = req.body(text.clone());
+        }
+        Some(RequestBody::Form(pairs)) => {
+            req = req.form(pairs);
+        }
+        Some(RequestBody::Multipart(pairs)) => {
+            let mut form = reqwest::blocking::multipart::Form::new();
+            for (k, v) in pairs {
+                form = form.text(k.clone(), v.clone());
+            }
+            req = req.multipart(form);
+        }
+        None => {}
+    }
+    req.send()
+}
+
+fn collect_response_headers(
+    resp: &reqwest::blocking::Response,
+) -> (HashMap<String, String>, Vec<String>, Option<String>) {
+    let mut headers_map = HashMap::new();
+    let mut set_cookies: Vec<String> = Vec::new();
+    for (k, v) in resp.headers() {
+        if let Ok(val) = v.to_str() {
+            if k.as_str().eq_ignore_ascii_case("set-cookie") {
+                set_cookies.push(val.to_owned());
+            }
+            headers_map.insert(k.to_string(), val.to_owned());
+        }
+    }
+    let location = headers_map
+        .iter()
+        .find(|(k, _)| k.eq_ignore_ascii_case("location"))
+        .map(|(_, v)| v.clone());
+    (headers_map, set_cookies, location)
+}
+
+fn resolve_redirect(base: &str, location: &str) -> Result<String, String> {
+    let base = Url::parse(base).map_err(|e| format!("Invalid URL: {e}"))?;
+    let next = base
+        .join(location)
+        .map_err(|e| format!("Invalid redirect target: {e}"))?;
+    Ok(next.to_string())
+}
+
+pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
+    let timeout_secs = if opts.timeout_secs == 0 {
+        30
+    } else {
+        opts.timeout_secs
+    };
+    let client = build_client(opts, timeout_secs)?;
 
     let start = Instant::now();
 
@@ -123,44 +182,18 @@ pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
     let mut hops: u32 = 0;
 
     let (final_status, final_status_text, headers, body) = loop {
-        let mut req = client.request(current_method.clone(), &current_url);
-        for (k, v) in &opts.headers {
-            req = req.header(k.as_str(), v.as_str());
-        }
-        match &current_body {
-            Some(RequestBody::Raw(text)) => {
-                req = req.body(text.clone());
-            }
-            Some(RequestBody::Form(pairs)) => {
-                req = req.form(pairs);
-            }
-            Some(RequestBody::Multipart(pairs)) => {
-                let mut form = reqwest::blocking::multipart::Form::new();
-                for (k, v) in pairs {
-                    form = form.text(k.clone(), v.clone());
-                }
-                req = req.multipart(form);
-            }
-            None => {}
-        }
-
-        let resp = req.send().map_err(|e| classify_error(&e, timeout_secs))?;
+        let resp = send_one_hop(
+            &client,
+            &current_method,
+            &current_url,
+            &opts.headers,
+            current_body.as_ref(),
+        )
+        .map_err(|e| classify_error(&e, timeout_secs))?;
         let status = resp.status().as_u16();
         let status_text = resp.status().to_string();
-
-        let mut headers_map = HashMap::new();
-        for (k, v) in resp.headers() {
-            if let Ok(val) = v.to_str() {
-                if k.as_str().eq_ignore_ascii_case("set-cookie") {
-                    set_cookies.push(val.to_owned());
-                }
-                headers_map.insert(k.to_string(), val.to_owned());
-            }
-        }
-        let location = headers_map
-            .iter()
-            .find(|(k, _)| k.eq_ignore_ascii_case("location"))
-            .map(|(_, v)| v.clone());
+        let (headers_map, mut hop_cookies, location) = collect_response_headers(&resp);
+        set_cookies.append(&mut hop_cookies);
 
         let is_redirect = (300..400).contains(&status) && status != 304;
         if !opts.follow_redirects || !is_redirect {
@@ -177,7 +210,6 @@ pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
             break (status, status_text, headers_map, body_text);
         };
 
-        // Drop the in-flight body so the next hop can be issued.
         drop(resp);
 
         hops += 1;
@@ -185,11 +217,7 @@ pub fn send_request(opts: &RequestOptions) -> Result<HttpResponse, String> {
             return Err("Too many redirects (>10)".to_owned());
         }
 
-        let base = Url::parse(&current_url).map_err(|e| format!("Invalid URL: {e}"))?;
-        let next = base
-            .join(&loc)
-            .map_err(|e| format!("Invalid redirect target: {e}"))?;
-        current_url = next.to_string();
+        current_url = resolve_redirect(&current_url, &loc)?;
         redirect_chain.push(current_url.clone());
 
         if matches!(status, 301..=303) && current_method != Method::HEAD {

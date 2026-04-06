@@ -133,7 +133,6 @@ fn run(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> 
 }
 
 /// Returns `true` when the app should quit.
-#[allow(clippy::too_many_lines)]
 fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
     app.response.clipboard_msg = None;
     if app.sidebar.confirm_delete {
@@ -146,114 +145,88 @@ fn handle_key(app: &mut App, key: &event::KeyEvent) -> bool {
     if app.ui.view == View::Settings {
         return handle_settings_key(app, key.code);
     }
-    if app.response.searching {
-        handle_search_key(app, key.code);
+    if try_dispatch_modal(app, key) {
         return false;
     }
+    if try_dispatch_editing(app, key) {
+        return false;
+    }
+    handle_normal_key(app, key.code)
+}
+
+/// Returns `true` if a modal popup consumed the key.
+fn try_dispatch_modal(app: &mut App, key: &event::KeyEvent) -> bool {
+    if app.response.searching {
+        handle_search_key(app, key.code);
+    } else if app.timeout.popup_open {
+        handle_timeout_popup_key(app, key.code);
+    } else if app.tls.popup_open {
+        handle_tls_popup_key(app, key.code);
+    } else if app.cookies.popup_open {
+        handle_cookies_popup_key(app, key.code);
+    } else if app.extractors.popup_open {
+        handle_extractors_popup_key(app, key.code);
+    } else if app.assertions.popup_open {
+        handle_assertions_popup_key(app, key.code);
+    } else if app.env.popup_open {
+        handle_env_popup_key(app, key.code);
+    } else if app.curl_io.export_open {
+        if key.code == KeyCode::Esc {
+            app.curl_io.export_open = false;
+        }
+    } else if app.postman_io.open {
+        handle_postman_import_key(app, key);
+    } else if app.curl_io.import_open {
+        handle_curl_import_key(app, key);
+    } else if app.history.open {
+        handle_history_key(app, key.code);
+    } else if app.method_popup.open {
+        handle_method_popup_key(app, key.code);
+    } else {
+        return false;
+    }
+    true
+}
+
+/// Returns `true` if an inline editing mode consumed the key.
+fn try_dispatch_editing(app: &mut App, key: &event::KeyEvent) -> bool {
     if app.request.form_editor.editing {
         handle_kv_edit_key(&mut app.request.form_editor, key.code);
         if !app.request.form_editor.editing {
             app.sync_to_collection();
         }
-        return false;
-    }
-    if app.request.header_editor.editing {
+    } else if app.request.header_editor.editing {
         handle_kv_edit_key(&mut app.request.header_editor, key.code);
         if !app.request.header_editor.editing {
             app.sync_to_collection();
         }
-        return false;
-    }
-    if app.request.param_editor.editing {
+    } else if app.request.param_editor.editing {
         handle_kv_edit_key(&mut app.request.param_editor, key.code);
         if !app.request.param_editor.editing {
             app.sync_params_to_url();
         }
-        return false;
-    }
-    if app.auth.editing {
+    } else if app.auth.editing {
         handle_auth_edit_key(app, key.code);
-        return false;
-    }
-    if app.auth.selecting_type {
+    } else if app.auth.selecting_type {
         handle_auth_type_select_key(app, key.code);
-        return false;
-    }
-    if app.env.editor.editing_var {
+    } else if app.env.editor.editing_var {
         handle_env_var_edit_key(app, key.code);
-        return false;
-    }
-    if app.env.editor.open {
+    } else if app.env.editor.open {
         handle_env_editor_key(app, key.code);
-        return false;
-    }
-    if app.env.renaming {
+    } else if app.env.renaming {
         handle_env_rename_key(app, key.code);
-        return false;
-    }
-    if app.env.import.open {
+    } else if app.env.import.open {
         handle_env_import_key(app, key.code);
-        return false;
-    }
-    if app.timeout.popup_open {
-        handle_timeout_popup_key(app, key.code);
-        return false;
-    }
-    if app.tls.popup_open {
-        handle_tls_popup_key(app, key.code);
-        return false;
-    }
-    if app.cookies.popup_open {
-        handle_cookies_popup_key(app, key.code);
-        return false;
-    }
-    if app.extractors.popup_open {
-        handle_extractors_popup_key(app, key.code);
-        return false;
-    }
-    if app.assertions.popup_open {
-        handle_assertions_popup_key(app, key.code);
-        return false;
-    }
-    if app.env.popup_open {
-        handle_env_popup_key(app, key.code);
-        return false;
-    }
-    if app.curl_io.export_open {
-        if key.code == KeyCode::Esc {
-            app.curl_io.export_open = false;
-        }
-        return false;
-    }
-    if app.postman_io.open {
-        handle_postman_import_key(app, key);
-        return false;
-    }
-    if app.curl_io.import_open {
-        handle_curl_import_key(app, key);
-        return false;
-    }
-    if app.history.open {
-        handle_history_key(app, key.code);
-        return false;
-    }
-    if app.method_popup.open {
-        handle_method_popup_key(app, key.code);
-        return false;
-    }
-    if app.sidebar.editing_name {
+    } else if app.sidebar.editing_name {
         handle_sidebar_edit_key(app, key.code);
-        return false;
-    }
-    if app.request.editing_url {
+    } else if app.request.editing_url {
         handle_url_edit_key(app, key.code);
-        return false;
-    }
-    if app.request.editing_body {
+    } else if app.request.editing_body {
         handle_body_edit_key(app, key.code);
+    } else {
         return false;
     }
-    handle_normal_key(app, key.code)
+    true
 }
 
 fn handle_settings_key(app: &mut App, key: KeyCode) -> bool {
