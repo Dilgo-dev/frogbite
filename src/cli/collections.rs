@@ -143,6 +143,8 @@ pub struct SavedRequest {
     pub gql_variables: String,
     #[serde(default)]
     pub gql_operation_name: String,
+    #[serde(default)]
+    pub proxy_url: String,
 }
 
 pub const fn default_timeout() -> u64 {

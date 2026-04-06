@@ -260,6 +260,7 @@ impl App {
             client_cert_path: self.tls.client_cert.clone(),
             client_key_path: self.tls.client_key.clone(),
             tls_min_version: self.tls.min_version.clone(),
+            proxy_url: self.proxy.url.clone(),
         };
 
         match http::send_request(&opts) {

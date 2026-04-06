@@ -68,6 +68,9 @@ pub struct SendArgs {
     /// Output format
     #[arg(long, value_enum, default_value_t = OutputFormat::Pretty)]
     pub format: OutputFormat,
+    /// Proxy URL (http://, https://, socks5://)
+    #[arg(short = 'x', long, value_name = "URL")]
+    pub proxy: Option<String>,
 }
 
 pub fn execute(cmd: &Command) -> ExitCode {
@@ -106,6 +109,7 @@ fn run_send(args: &SendArgs) -> Result<ExitCode, String> {
         client_cert_path: String::new(),
         client_key_path: String::new(),
         tls_min_version: String::new(),
+        proxy_url: args.proxy.clone().unwrap_or_default(),
     };
 
     let resp = send_request(&opts)?;
@@ -395,6 +399,7 @@ fn send_saved(req: &SavedRequest) -> Result<HttpResponse, String> {
         client_cert_path: req.client_cert_path.clone(),
         client_key_path: req.client_key_path.clone(),
         tls_min_version: req.tls_min_version.clone(),
+        proxy_url: req.proxy_url.clone(),
     };
     send_request(&opts)
 }

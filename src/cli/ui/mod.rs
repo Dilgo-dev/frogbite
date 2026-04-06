@@ -133,6 +133,9 @@ fn draw_main(frame: &mut Frame, app: &App) {
     if app.diff.popup_open {
         modals::draw_diff_popup(frame, app);
     }
+    if app.proxy.popup_open {
+        modals::draw_proxy_popup(frame, app);
+    }
 }
 
 #[allow(clippy::too_many_lines)]
@@ -193,6 +196,8 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
         "Esc:close"
     } else if app.curl_io.import_open {
         "paste cURL  Ctrl+S:import  Esc:cancel"
+    } else if app.proxy.popup_open {
+        "type proxy URL  Enter:save  Esc:cancel"
     } else if app.diff.popup_open {
         "j/k:scroll  s:swap  c:clear  Esc:close"
     } else if app.graphql.vars_popup_open {
@@ -219,7 +224,7 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
                     "j/k:nav  a:new  A:folder  d:del  D:dup  r:rename  i:curl  I:postman  q:quit"
                 }
                 Focus::UrlBar => {
-                    "e:edit  m:method  P:proto  G:grpcmethod  A:auth  R:redir  T:tout  S:tls  C:cookies"
+                    "e:edit  m:method  P:proto  G:gqlmeth  A:auth  T:tout  S:tls  C:cook  Y:proxy"
                 }
                 Focus::Body => match app.request.tab {
                     RequestTab::Body => {

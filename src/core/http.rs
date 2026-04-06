@@ -35,6 +35,8 @@ pub struct RequestOptions {
     pub client_key_path: String,
     #[serde(default)]
     pub tls_min_version: String,
+    #[serde(default)]
+    pub proxy_url: String,
 }
 
 /// Parsed HTTP response with status, headers, body and timing.
@@ -96,6 +98,15 @@ fn build_client(opts: &RequestOptions, timeout_secs: u64) -> Result<Client, Stri
         "1.2" => builder = builder.min_tls_version(Version::TLS_1_2),
         "1.3" => builder = builder.min_tls_version(Version::TLS_1_3),
         _ => {}
+    }
+
+    let proxy = opts.proxy_url.trim();
+    if proxy.is_empty() {
+        builder = builder.no_proxy();
+    } else {
+        let p =
+            reqwest::Proxy::all(proxy).map_err(|e| format!("Proxy parse failed ({proxy}): {e}"))?;
+        builder = builder.proxy(p);
     }
 
     builder

@@ -1,6 +1,32 @@
 use super::*;
 
 impl App {
+    pub fn open_proxy_popup(&mut self) {
+        self.proxy.buffer.clone_from(&self.proxy.url);
+        self.proxy.error = None;
+        self.proxy.popup_open = true;
+    }
+
+    pub fn confirm_proxy_popup(&mut self) {
+        let val = self.proxy.buffer.trim().to_owned();
+        if !val.is_empty() {
+            let lower = val.to_ascii_lowercase();
+            if !(lower.starts_with("http://")
+                || lower.starts_with("https://")
+                || lower.starts_with("socks5://")
+                || lower.starts_with("socks5h://"))
+            {
+                self.proxy.error =
+                    Some("scheme must be http://, https://, socks5:// or socks5h://".to_owned());
+                return;
+            }
+        }
+        self.proxy.url = val;
+        self.proxy.popup_open = false;
+        self.proxy.error = None;
+        self.sync_to_collection();
+    }
+
     pub fn open_timeout_popup(&mut self) {
         self.timeout.buffer = self.timeout.secs.to_string();
         self.timeout.error = false;
@@ -322,6 +348,7 @@ impl App {
             client_cert_path: self.tls.client_cert.clone(),
             client_key_path: self.tls.client_key.clone(),
             tls_min_version: self.tls.min_version.clone(),
+            proxy_url: self.proxy.url.clone(),
         };
 
         let resolved_for_pending = opts.url.clone();

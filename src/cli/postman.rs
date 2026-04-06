@@ -144,6 +144,7 @@ fn process_item(
             grpc_method: String::new(),
             gql_variables: String::new(),
             gql_operation_name: String::new(),
+            proxy_url: String::new(),
         });
     }
 }

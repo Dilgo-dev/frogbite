@@ -158,6 +158,7 @@ impl App {
             self.tls.client_cert.clone_from(&req.client_cert_path);
             self.tls.client_key.clone_from(&req.client_key_path);
             self.tls.min_version.clone_from(&req.tls_min_version);
+            self.proxy.url.clone_from(&req.proxy_url);
             self.extractors.editor.entries.clone_from(&req.extractors);
             self.extractors.editor.selected = 0;
             self.extractors.editor.editing = false;
@@ -214,6 +215,7 @@ impl App {
             req.client_cert_path.clone_from(&self.tls.client_cert);
             req.client_key_path.clone_from(&self.tls.client_key);
             req.tls_min_version.clone_from(&self.tls.min_version);
+            req.proxy_url.clone_from(&self.proxy.url);
             req.extractors.clone_from(&self.extractors.editor.entries);
             req.assertions.clone_from(&self.assertions.exprs);
         }
@@ -389,6 +391,7 @@ impl App {
             grpc_method: String::new(),
             gql_variables: String::new(),
             gql_operation_name: String::new(),
+            proxy_url: String::new(),
         };
 
         let id = req.id.clone();
@@ -450,6 +453,7 @@ impl App {
                 grpc_method: req.grpc_method,
                 gql_variables: req.gql_variables,
                 gql_operation_name: req.gql_operation_name,
+                proxy_url: req.proxy_url,
             };
             let id = new_req.id.clone();
             self.sidebar.requests.push(new_req);

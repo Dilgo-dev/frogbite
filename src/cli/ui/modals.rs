@@ -1098,6 +1098,53 @@ pub(super) fn draw_proto_popup(frame: &mut Frame, app: &App) {
     frame.render_widget(Paragraph::new(Text::from(lines)), inner);
 }
 
+pub(super) fn draw_proxy_popup(frame: &mut Frame, app: &App) {
+    let area = frame.area();
+    let popup_w = area.width.saturating_sub(10).min(80);
+    let popup_h: u16 = 7;
+    let x = (area.width.saturating_sub(popup_w)) / 2;
+    let y = (area.height.saturating_sub(popup_h)) / 2;
+    let popup_area = Rect::new(x, y, popup_w, popup_h);
+
+    frame.render_widget(Clear, popup_area);
+
+    let block = Block::default()
+        .title(" Proxy URL ")
+        .title_style(Style::default().fg(GREEN).bold())
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(GREEN))
+        .bg(BG);
+    let inner = block.inner(popup_area);
+    frame.render_widget(block, popup_area);
+
+    let mut lines = vec![
+        Line::from(Span::styled(
+            "  http://, https://, socks5:// or socks5h:// (empty = no proxy)",
+            Style::default().fg(MUTED),
+        )),
+        Line::from(vec![
+            Span::raw("  "),
+            Span::styled(
+                format!("{}\u{2588}", app.proxy.buffer),
+                Style::default().fg(FG),
+            ),
+        ]),
+        Line::default(),
+    ];
+    if let Some(err) = &app.proxy.error {
+        lines.push(Line::from(Span::styled(
+            format!("  ! {err}"),
+            Style::default().fg(RED),
+        )));
+    } else {
+        lines.push(Line::from(Span::styled(
+            "  Enter:save  Esc:cancel",
+            Style::default().fg(MUTED),
+        )));
+    }
+    frame.render_widget(Paragraph::new(Text::from(lines)), inner);
+}
+
 pub(super) fn draw_diff_popup(frame: &mut Frame, app: &App) {
     use similar::{ChangeTag, TextDiff};
 
