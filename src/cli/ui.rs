@@ -1712,7 +1712,7 @@ pub fn draw_help_bar(frame: &mut Frame, app: &App) {
             View::Main if app.confirm_delete => "y:confirm delete  any:cancel",
             View::Main => match app.focus {
                 Focus::Sidebar => {
-                    "j/k:nav  a:new  d:del  D:dup  r:rename  i:curl  I:postman  E:env  q:quit"
+                    "j/k:nav  a:new  A:folder  d:del  D:dup  r:rename  i:curl  I:postman  q:quit"
                 }
                 Focus::UrlBar => {
                     "e:edit  m:method  A:auth  Enter:send  h:history  E:env  s:settings"
