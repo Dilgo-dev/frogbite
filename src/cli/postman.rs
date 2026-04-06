@@ -16,7 +16,7 @@ struct Item {
     name: Option<String>,
     request: Option<Request>,
     #[serde(rename = "item")]
-    children: Option<Vec<Item>>,
+    children: Option<Vec<Self>>,
 }
 
 #[derive(Deserialize)]
