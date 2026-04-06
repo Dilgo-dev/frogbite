@@ -1117,21 +1117,33 @@ pub(super) fn draw_gql_vars_popup(frame: &mut Frame, app: &App) {
     let inner = block.inner(popup_area);
     frame.render_widget(block, popup_area);
 
-    let mut lines: Vec<Line> = app
-        .graphql
-        .vars_buffer
-        .lines()
-        .map(|l| Line::from(Span::styled(l.to_owned(), Style::default().fg(FG))))
+    let row = app.graphql.vars_row;
+    let col = app.graphql.vars_col;
+    let raw_lines: Vec<&str> = if app.graphql.vars_buffer.is_empty() {
+        vec![""]
+    } else {
+        app.graphql.vars_buffer.split('\n').collect()
+    };
+    let mut lines: Vec<Line> = raw_lines
+        .iter()
+        .enumerate()
+        .map(|(i, l)| {
+            if i == row {
+                let c = col.min(l.len());
+                let before = &l[..c];
+                let cursor_ch = l[c..].chars().next().unwrap_or(' ');
+                let after_start = c + cursor_ch.len_utf8().min(l.len() - c);
+                let after = &l[after_start..];
+                Line::from(vec![
+                    Span::styled(before.to_owned(), Style::default().fg(FG)),
+                    Span::styled(cursor_ch.to_string(), Style::default().fg(BG).bg(GREEN)),
+                    Span::styled(after.to_owned(), Style::default().fg(FG)),
+                ])
+            } else {
+                Line::from(Span::styled((*l).to_owned(), Style::default().fg(FG)))
+            }
+        })
         .collect();
-    if app.graphql.vars_buffer.ends_with('\n') || app.graphql.vars_buffer.is_empty() {
-        lines.push(Line::from(Span::styled(
-            "\u{2588}",
-            Style::default().fg(GREEN),
-        )));
-    } else if let Some(last) = lines.last_mut() {
-        last.spans
-            .push(Span::styled("\u{2588}", Style::default().fg(GREEN)));
-    }
     if let Some(err) = &app.graphql.vars_error {
         lines.push(Line::default());
         lines.push(Line::from(Span::styled(

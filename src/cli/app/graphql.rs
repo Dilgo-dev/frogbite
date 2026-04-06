@@ -23,11 +23,107 @@ pub struct GqlArg {
 pub struct GraphqlState {
     pub vars_popup_open: bool,
     pub vars_buffer: String,
+    pub vars_row: usize,
+    pub vars_col: usize,
     pub vars_error: Option<String>,
     pub schema_popup_open: bool,
     pub schema_popup_selected: usize,
     pub operations: Vec<GqlOperation>,
     pub schema_error: Option<String>,
+}
+
+impl GraphqlState {
+    fn line_count(&self) -> usize {
+        self.vars_buffer.split('\n').count().max(1)
+    }
+
+    fn line_len(&self, row: usize) -> usize {
+        self.vars_buffer.split('\n').nth(row).map_or(0, str::len)
+    }
+
+    fn cursor_offset(&self) -> usize {
+        let mut offset = 0;
+        for (i, line) in self.vars_buffer.split('\n').enumerate() {
+            if i == self.vars_row {
+                return offset + self.vars_col.min(line.len());
+            }
+            offset += line.len() + 1;
+        }
+        self.vars_buffer.len()
+    }
+
+    pub fn vars_insert(&mut self, c: char) {
+        let offset = self.cursor_offset();
+        self.vars_buffer.insert(offset, c);
+        self.vars_col += c.len_utf8();
+        self.vars_error = None;
+    }
+
+    pub fn vars_insert_newline(&mut self) {
+        let offset = self.cursor_offset();
+        self.vars_buffer.insert(offset, '\n');
+        self.vars_row += 1;
+        self.vars_col = 0;
+        self.vars_error = None;
+    }
+
+    pub fn vars_backspace(&mut self) {
+        if self.vars_col > 0 {
+            let offset = self.cursor_offset();
+            self.vars_buffer.remove(offset - 1);
+            self.vars_col -= 1;
+        } else if self.vars_row > 0 {
+            let prev_len = self.line_len(self.vars_row - 1);
+            let offset = self.cursor_offset();
+            self.vars_buffer.remove(offset - 1);
+            self.vars_row -= 1;
+            self.vars_col = prev_len;
+        }
+        self.vars_error = None;
+    }
+
+    pub fn vars_delete(&mut self) {
+        let offset = self.cursor_offset();
+        if offset < self.vars_buffer.len() {
+            self.vars_buffer.remove(offset);
+            self.vars_error = None;
+        }
+    }
+
+    pub const fn vars_left(&mut self) {
+        if self.vars_col > 0 {
+            self.vars_col -= 1;
+        }
+    }
+
+    pub fn vars_right(&mut self) {
+        let line_len = self.line_len(self.vars_row);
+        if self.vars_col < line_len {
+            self.vars_col += 1;
+        }
+    }
+
+    pub fn vars_up(&mut self) {
+        if self.vars_row > 0 {
+            self.vars_row -= 1;
+            self.vars_col = self.vars_col.min(self.line_len(self.vars_row));
+        }
+    }
+
+    pub fn vars_down(&mut self) {
+        if self.vars_row + 1 < self.line_count() {
+            self.vars_row += 1;
+            self.vars_col = self.vars_col.min(self.line_len(self.vars_row));
+        }
+    }
+
+    pub const fn vars_home(&mut self) {
+        self.vars_col = 0;
+    }
+
+    pub fn vars_end(&mut self) {
+        self.vars_col = self.line_len(self.vars_row);
+    }
 }
 
 const INTROSPECTION_QUERY: &str = r"
@@ -110,6 +206,9 @@ impl App {
     /// list of operations in `graphql.operations`.
     pub fn open_gql_vars_popup(&mut self) {
         self.graphql.vars_buffer = self.active_gql_variables();
+        let last_row = self.graphql.line_count().saturating_sub(1);
+        self.graphql.vars_row = last_row;
+        self.graphql.vars_col = self.graphql.line_len(last_row);
         self.graphql.vars_error = None;
         self.graphql.vars_popup_open = true;
     }

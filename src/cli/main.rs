@@ -429,18 +429,20 @@ fn handle_gql_vars_popup_key(app: &mut App, key: &event::KeyEvent) {
         KeyCode::Char('s') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.confirm_gql_vars_popup();
         }
-        KeyCode::Enter => {
-            app.graphql.vars_buffer.push('\n');
-            app.graphql.vars_error = None;
+        KeyCode::Enter => app.graphql.vars_insert_newline(),
+        KeyCode::Backspace => app.graphql.vars_backspace(),
+        KeyCode::Delete => app.graphql.vars_delete(),
+        KeyCode::Left => app.graphql.vars_left(),
+        KeyCode::Right => app.graphql.vars_right(),
+        KeyCode::Up => app.graphql.vars_up(),
+        KeyCode::Down => app.graphql.vars_down(),
+        KeyCode::Home => app.graphql.vars_home(),
+        KeyCode::End => app.graphql.vars_end(),
+        KeyCode::Tab => {
+            app.graphql.vars_insert(' ');
+            app.graphql.vars_insert(' ');
         }
-        KeyCode::Backspace => {
-            app.graphql.vars_buffer.pop();
-            app.graphql.vars_error = None;
-        }
-        KeyCode::Char(c) => {
-            app.graphql.vars_buffer.push(c);
-            app.graphql.vars_error = None;
-        }
+        KeyCode::Char(c) => app.graphql.vars_insert(c),
         _ => {}
     }
 }
