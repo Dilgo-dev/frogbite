@@ -74,6 +74,11 @@ fn main() -> ExitCode {
 
 fn run_tui() -> io::Result<()> {
     let s = settings::load();
+
+    if std::env::var("FROGBITE_DEBUG").as_deref() == Ok("1") {
+        eprintln!("config dir: {}", settings::dirs_path().display());
+    }
+
     ui::theme::init(&s.theme);
 
     let update_rx = if s.update_check {

@@ -41,7 +41,8 @@ fn settings_path() -> PathBuf {
     config_dir.join("settings.json")
 }
 
-fn dirs_path() -> PathBuf {
+/// Returns the frogbite config directory, creating it if needed.
+pub fn dirs_path() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
     let path = PathBuf::from(home).join(".config").join("frogbite");
     let _ = fs::create_dir_all(&path);
