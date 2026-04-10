@@ -34,7 +34,24 @@ use app::{App, Focus, Method, RequestTab, ResponseTab, View};
                   Run without arguments to launch the interactive TUI.\n\
                   Use subcommands to send one-off requests, run saved collections \
                   as test suites, or update frogbite to the latest release.\n\n\
-                  Config and data are stored in ~/.config/frogbite/."
+                  Config and data: ~/.config/frogbite/\n\
+                  \x20 collections.json   saved requests and folders\n\
+                  \x20 settings.json      theme, splash, update check\n\
+                  \x20 environments.json  env variable sets\n\
+                  \x20 history.json       request history\n\n\
+                  Main keybindings (in the TUI):\n\
+                  \x20 Tab / Shift+Tab    cycle panels (sidebar, url, body, response)\n\
+                  \x20 j / k              navigate lists and scroll\n\
+                  \x20 e / i              enter edit mode\n\
+                  \x20 Esc                exit edit mode / close popup\n\
+                  \x20 Enter              send request (from url bar or body)\n\
+                  \x20 a                  new request      A   new folder\n\
+                  \x20 d                  delete           D   duplicate\n\
+                  \x20 r                  rename           m   change method\n\
+                  \x20 E                  environments     A   auth config\n\
+                  \x20 s                  settings         H   history\n\
+                  \x20 i                  import curl      I   import postman\n\
+                  \x20 q                  quit"
 )]
 struct Cli {
     #[command(subcommand)]
